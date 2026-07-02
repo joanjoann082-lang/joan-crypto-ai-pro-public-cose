@@ -75,3 +75,13 @@ __pycache__/
 nohup.out
 stdout.log
 stderr.log
+
+# Backup / audit noise - public mirror forbidden
+*.before_*
+*before_*
+*.bak_*
+*.bak*
+*.BROKEN*
+*BROKEN*
+*broken*
+audit_export_*
