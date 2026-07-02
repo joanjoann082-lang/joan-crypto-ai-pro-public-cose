@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="180">
+<title>JoanBot Live Status</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; margin: 24px; background:#0b0f14; color:#e6edf3; }
+.card { background:#111827; border:1px solid #263244; border-radius:14px; padding:18px; margin:14px 0; }
+.green { color:#00d18f; font-weight:700; }
+.red { color:#ff4d4d; font-weight:700; }
+table { border-collapse: collapse; width:100%; }
+td, th { border-bottom:1px solid #263244; padding:9px; text-align:left; }
+td:last-child { text-align:right; font-family: monospace; }
+small, code { color:#9fb0c0; }
+</style>
+</head>
+<body>
+<h1>JoanBot Live Status</h1>
+<div class="card">
+<p>Updated UTC: <code>2026-07-02T13:46:36.544904+00:00</code></p>
+<p>Health: <span class="green">GREEN</span></p>
+<p>DB: <code>ok</code></p>
+</div>
+<div class="card">
+<h2>Money / Cash / PnL</h2>
+<table><tr><td>Base equity</td><td>100000.0</td></tr>
+<tr><td>Cash balance realized</td><td>99998.928454</td></tr>
+<tr><td>Marked equity</td><td>99998.928454</td></tr>
+<tr><td>Realized PnL</td><td>-1.071546</td></tr>
+<tr><td>Unrealized PnL</td><td>0.0</td></tr>
+<tr><td>Total PnL</td><td>-1.071546</td></tr>
+<tr><td>Realized return %</td><td>-0.001072</td></tr>
+<tr><td>Marked return %</td><td>-0.001072</td></tr>
+<tr><td>Open positions</td><td>0</td></tr>
+<tr><td>Closed positions</td><td>7</td></tr>
+<tr><td>Win rate %</td><td>57.1429</td></tr>
+<tr><td>Profit factor</td><td>0.890143</td></tr>
+<tr><td>Expectancy/trade</td><td>-0.153078</td></tr>
+<tr><td>Max realized drawdown</td><td>-7.353075</td></tr>
+<tr><td>Open exposure</td><td>0.0</td></tr>
+<tr><td>Approx open risk</td><td>0.0</td></tr>
+</table>
+</div>
+<div class="card">
+<h2>Health Problems</h2>
+<ul><li>NONE</li></ul>
+</div>
+<div class="card">
+<h2>Files</h2>
+<p>See <code>status.md</code>, <code>money.md</code>, and <code>status.json</code> in the live-status branch.</p>
+</div>
+</body>
+</html>
