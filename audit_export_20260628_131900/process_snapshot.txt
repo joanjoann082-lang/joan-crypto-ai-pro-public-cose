@@ -1,2 +1,0 @@
-===== PROCESS SNAPSHOT =====
-u0_a197   7156  1428  6  1970 pts/0    00:05:46 python -u -m joanbot.runtime.institutional_runtime_v9

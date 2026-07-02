@@ -1,3 +1,0 @@
-===== ERROR LOGS TAIL =====
-nohup: ignoring input
-nohup: ignoring input
