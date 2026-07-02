@@ -1,0 +1,120 @@
+{
+  "version": "V23.1_OPERATING_POLICY_PRO",
+  "paths": {
+    "live": "/storage/emulated/0/Download/joan_crypto_ai_pro_v14",
+    "clean": "/storage/emulated/0/Download/joan_crypto_ai_pro_v14_RELEASE_CLEAN",
+    "db": "data/joanbot_v14.sqlite"
+  },
+  "runtime_policy": {
+    "paper_only": true,
+    "real_execution_allowed": false,
+    "v21_enabled": false,
+    "v19_contract_governor_enabled": false,
+    "old_payoff_enabled": false,
+    "required_runtime_verdicts": ["OK_RUNTIME_MANAGER_ACTIVE", "DEGRADED"]
+  },
+  "services": [
+    {
+      "name": "DATA_PLANE",
+      "enabled": true,
+      "critical": true,
+      "pattern": "run_v18_9_1_data_plane_forever|v18_9_1_semantic_data_plane",
+      "script": "scripts/run_v18_9_1_data_plane_forever.sh"
+    },
+    {
+      "name": "LIQUIDATION_COLLECTOR",
+      "enabled": true,
+      "critical": false,
+      "pattern": "run_v18_10_liquidation_collector_forever|v18_10_liquidation_collector",
+      "script": "scripts/run_v18_10_liquidation_collector_forever.sh"
+    },
+    {
+      "name": "QUANT_BRAIN",
+      "enabled": true,
+      "critical": true,
+      "pattern": "run_v17_5_1_quant_brain_forever|quant_brain_v17_5_1|tools/run_quant_brain_v17_5_1",
+      "script": "scripts/run_v17_5_1_quant_brain_forever.sh"
+    },
+    {
+      "name": "PROMOTION_CONTROLLER",
+      "enabled": true,
+      "critical": true,
+      "pattern": "run_v17_6_1_promotion_controller_forever|promotion_controller_v17_6_1",
+      "script": "scripts/run_v17_6_1_promotion_controller_forever.sh"
+    },
+    {
+      "name": "PAPER_ADAPTER",
+      "enabled": true,
+      "critical": true,
+      "pattern": "run_v17_8_1_paper_canary_adapter_forever|institutional_paper_canary_adapter_v17_8_1",
+      "script": "scripts/run_v17_8_1_paper_canary_adapter_forever.sh"
+    },
+    {
+      "name": "MARKET_CONTEXT",
+      "enabled": true,
+      "critical": false,
+      "pattern": "run_v18_2_market_context_forever|v18_2_market_context",
+      "script": "scripts/run_v18_2_market_context_forever.sh"
+    },
+    {
+      "name": "RUNTIME_MANAGER",
+      "enabled": true,
+      "critical": true,
+      "pattern": "run_v22_1_runtime_manager_forever|v22_1_runtime_manager.py --daemon",
+      "script": "scripts/run_v22_1_runtime_manager_forever.sh"
+    },
+    {
+      "name": "V19_CONTRACT_GOVERNOR_DISABLED",
+      "enabled": false,
+      "critical": false,
+      "pattern": "run_v19_2_contract_governor_forever|v19_2_contract_governor",
+      "script": "scripts/run_v19_2_contract_governor_forever.sh"
+    },
+    {
+      "name": "V21_KERNEL_DISABLED_UNTIL_ADAPTER_FIX",
+      "enabled": false,
+      "critical": false,
+      "pattern": "run_v21_0_quant_kernel_forever|v21_0_institutional_quant_kernel",
+      "script": "scripts/run_v21_0_quant_kernel_forever.sh"
+    },
+    {
+      "name": "OLD_PAYOFF_DISABLED",
+      "enabled": false,
+      "critical": false,
+      "pattern": "run_v18_6_payoff_intelligence_forever|v18_6_payoff_intelligence",
+      "script": "scripts/run_v18_6_payoff_intelligence_forever.sh"
+    }
+  ],
+  "release_allowlist": [
+    ".gitignore",
+    "config/v23_1_operating_policy.json",
+    "tools/v22_1_runtime_manager.py",
+    "tools/v23_1_release_gate.py",
+    "scripts/run_v22_1_runtime_manager_forever.sh",
+    "scripts/v23_1_status.sh",
+    "scripts/v23_1_validate_live.sh",
+    "scripts/v23_1_release_to_github.sh"
+  ],
+  "forbidden_patterns": [
+    "data/",
+    "logs/",
+    ".env",
+    ".sqlite",
+    ".sqlite-",
+    ".db",
+    ".db-",
+    ".log",
+    ".pid",
+    ".bak",
+    ".backup",
+    ".old",
+    "BROKEN",
+    "broken",
+    "_before_",
+    "_backup_",
+    "audit_export",
+    "secret",
+    ".pem",
+    ".key"
+  ]
+}

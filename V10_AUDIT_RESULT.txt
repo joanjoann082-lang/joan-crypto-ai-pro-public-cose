@@ -1,0 +1,9 @@
+Audit result in sandbox:
+- Full Python compilation passed for all joanbot modules.
+- V10 schema modules were instantiated on a temporary SQLite database.
+- V10 bridge was tested to open one paper micro-canary and not reopen a second one after same-day close.
+- No paid API connector or key is included.
+- V9 files are left intact as fallback; V10 adds a stricter pre-API runtime.
+
+Known limitation:
+- Live network/API calls were not executed in sandbox. On Termux, run scripts/audit_institutional_runtime_v10.sh against the real data directory before starting.

@@ -1,0 +1,450 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import sqlite3
+import zlib
+from datetime import datetime, timezone
+
+DB = "data/joanbot_v14.sqlite"
+VERSION = "V16_3B_STORAGE_SPINE_GUARD"
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def stable_json(x):
+    try:
+        return json.dumps(x or {}, separators=(",", ":"), sort_keys=True, ensure_ascii=False, default=str)
+    except Exception:
+        return json.dumps({"repr": repr(x)}, separators=(",", ":"), sort_keys=True, ensure_ascii=False, default=str)
+
+
+def payload_hash(raw: str):
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def connect():
+    con = sqlite3.connect(DB, timeout=60)
+    con.execute("PRAGMA busy_timeout=60000;")
+    con.row_factory = sqlite3.Row
+    return con
+
+
+def exists(cur, table):
+    return cur.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone()[0] > 0
+
+
+def ensure(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS alpha_payload_library_v16 (
+            payload_hash TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            version TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            raw_bytes INTEGER NOT NULL,
+            compressed_bytes INTEGER NOT NULL,
+            use_count INTEGER NOT NULL DEFAULT 1,
+            compressed_payload BLOB NOT NULL
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS alpha_storage_guard_v16 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL,
+            version TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            before_n INTEGER,
+            after_n INTEGER,
+            retained_n INTEGER,
+            action TEXT NOT NULL,
+            payload TEXT
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS alpha_research_rollup_v16 (
+            key TEXT PRIMARY KEY,
+            updated_at TEXT NOT NULL,
+            version TEXT NOT NULL,
+            latest_source_id INTEGER,
+            symbol TEXT,
+            side TEXT,
+            setup TEXT,
+            profile TEXT,
+            horizon_min INTEGER,
+            research_state TEXT,
+            sample_n INTEGER,
+            live_n INTEGER,
+            expectancy_r REAL,
+            profit_factor REAL,
+            posterior_lcb_r REAL,
+            cpcv_score REAL,
+            feature_score REAL,
+            attribution_score REAL,
+            risk_score REAL,
+            final_score REAL,
+            recommended_size_mult REAL,
+            hard_vetoes TEXT,
+            payload_hash TEXT,
+            slim_payload TEXT
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS alpha_setup_registry_rollup_v16 (
+            key TEXT PRIMARY KEY,
+            updated_at TEXT NOT NULL,
+            version TEXT NOT NULL,
+            latest_source_id INTEGER,
+            symbol TEXT,
+            side TEXT,
+            setup TEXT,
+            profile TEXT,
+            horizon_min INTEGER,
+            lifecycle_state TEXT,
+            confidence_state TEXT,
+            sample_n INTEGER,
+            live_n INTEGER,
+            expectancy_r REAL,
+            profit_factor REAL,
+            posterior_lcb_r REAL,
+            max_drawdown_r REAL,
+            tail_10_r REAL,
+            final_score REAL,
+            size_mult REAL,
+            hard_vetoes TEXT,
+            payload_hash TEXT,
+            slim_payload TEXT
+        );
+    """)
+
+
+def archive_raw_payload(cur, raw_payload: str, kind: str):
+    raw_payload = raw_payload or "{}"
+
+    try:
+        parsed = json.loads(raw_payload)
+        if isinstance(parsed, dict) and parsed.get("payload_ref"):
+            return parsed.get("payload_ref"), raw_payload, False
+    except Exception:
+        parsed = {"raw_payload": raw_payload}
+
+    raw = stable_json(parsed)
+    h = payload_hash(raw)
+    raw_b = raw.encode("utf-8")
+    compressed = zlib.compress(raw_b, 6)
+
+    cur.execute("""
+        INSERT INTO alpha_payload_library_v16 (
+            payload_hash, created_at, version, kind,
+            raw_bytes, compressed_bytes, use_count, compressed_payload
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT(payload_hash) DO UPDATE SET
+            use_count = use_count + 1;
+    """, (
+        h,
+        now_iso(),
+        VERSION,
+        kind,
+        len(raw_b),
+        len(compressed),
+        compressed,
+    ))
+
+    slim = {
+        "storage": "ALPHA_PAYLOAD_LIBRARY_V16",
+        "payload_ref": h,
+        "kind": kind,
+        "raw_bytes": len(raw_b),
+        "compressed_bytes": len(compressed),
+        "compression": "zlib",
+        "archived_by": VERSION,
+    }
+
+    return h, stable_json(slim), True
+
+
+def compress_existing_payloads(cur, table, limit=5000):
+    if not exists(cur, table):
+        return {"table": table, "state": "NO_TABLE"}
+
+    rows = cur.execute(f"""
+        SELECT id, payload
+        FROM {table}
+        ORDER BY id DESC
+        LIMIT ?;
+    """, (limit,)).fetchall()
+
+    updated = 0
+
+    for r in rows:
+        d = dict(r)
+        raw_payload = d.get("payload") or "{}"
+
+        h, slim, changed = archive_raw_payload(cur, raw_payload, table)
+
+        if changed:
+            cur.execute(f"""
+                UPDATE {table}
+                SET payload=?
+                WHERE id=?;
+            """, (slim, d["id"]))
+            updated += 1
+
+    return {"table": table, "checked": len(rows), "updated": updated}
+
+
+def key_for(d):
+    return "|".join([
+        str(d.get("symbol") or ""),
+        str(d.get("side") or ""),
+        str(d.get("setup") or ""),
+        str(d.get("profile") or ""),
+        str(d.get("horizon_min") or ""),
+    ])
+
+
+def rebuild_research_rollup(cur):
+    if not exists(cur, "alpha_research_v16"):
+        return {"state": "NO_TABLE"}
+
+    rows = cur.execute("""
+        SELECT *
+        FROM alpha_research_v16
+        WHERE symbol IS NOT NULL AND setup IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 5000;
+    """).fetchall()
+
+    latest = {}
+
+    for r in rows:
+        d = dict(r)
+        k = key_for(d)
+        if k not in latest:
+            latest[k] = d
+
+    for k, d in latest.items():
+        raw = d.get("payload") or "{}"
+        h, slim, _ = archive_raw_payload(cur, raw, "alpha_research_rollup_v16")
+
+        cur.execute("""
+            INSERT INTO alpha_research_rollup_v16 (
+                key, updated_at, version, latest_source_id,
+                symbol, side, setup, profile, horizon_min,
+                research_state, sample_n, live_n, expectancy_r,
+                profit_factor, posterior_lcb_r, cpcv_score,
+                feature_score, attribution_score, risk_score, final_score,
+                recommended_size_mult, hard_vetoes, payload_hash, slim_payload
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                updated_at=excluded.updated_at,
+                version=excluded.version,
+                latest_source_id=excluded.latest_source_id,
+                research_state=excluded.research_state,
+                sample_n=excluded.sample_n,
+                live_n=excluded.live_n,
+                expectancy_r=excluded.expectancy_r,
+                profit_factor=excluded.profit_factor,
+                posterior_lcb_r=excluded.posterior_lcb_r,
+                cpcv_score=excluded.cpcv_score,
+                feature_score=excluded.feature_score,
+                attribution_score=excluded.attribution_score,
+                risk_score=excluded.risk_score,
+                final_score=excluded.final_score,
+                recommended_size_mult=excluded.recommended_size_mult,
+                hard_vetoes=excluded.hard_vetoes,
+                payload_hash=excluded.payload_hash,
+                slim_payload=excluded.slim_payload;
+        """, (
+            k, now_iso(), VERSION, d.get("id"),
+            d.get("symbol"), d.get("side"), d.get("setup"), d.get("profile"), d.get("horizon_min"),
+            d.get("research_state"), d.get("sample_n"), d.get("live_n"), d.get("expectancy_r"),
+            d.get("profit_factor"), d.get("posterior_lcb_r"), d.get("cpcv_score"),
+            d.get("feature_score"), d.get("attribution_score"), d.get("risk_score"), d.get("final_score"),
+            d.get("recommended_size_mult"), d.get("hard_vetoes"), h, slim,
+        ))
+
+    return {"state": "OK", "rollup_n": len(latest)}
+
+
+def rebuild_registry_rollup(cur):
+    if not exists(cur, "alpha_setup_registry_v16"):
+        return {"state": "NO_TABLE"}
+
+    rows = cur.execute("""
+        SELECT *
+        FROM alpha_setup_registry_v16
+        WHERE symbol IS NOT NULL AND setup IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 5000;
+    """).fetchall()
+
+    latest = {}
+
+    for r in rows:
+        d = dict(r)
+        k = key_for(d)
+        if k not in latest:
+            latest[k] = d
+
+    for k, d in latest.items():
+        raw = d.get("payload") or "{}"
+        h, slim, _ = archive_raw_payload(cur, raw, "alpha_setup_registry_rollup_v16")
+
+        cur.execute("""
+            INSERT INTO alpha_setup_registry_rollup_v16 (
+                key, updated_at, version, latest_source_id,
+                symbol, side, setup, profile, horizon_min,
+                lifecycle_state, confidence_state, sample_n, live_n,
+                expectancy_r, profit_factor, posterior_lcb_r,
+                max_drawdown_r, tail_10_r, final_score, size_mult,
+                hard_vetoes, payload_hash, slim_payload
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                updated_at=excluded.updated_at,
+                version=excluded.version,
+                latest_source_id=excluded.latest_source_id,
+                lifecycle_state=excluded.lifecycle_state,
+                confidence_state=excluded.confidence_state,
+                sample_n=excluded.sample_n,
+                live_n=excluded.live_n,
+                expectancy_r=excluded.expectancy_r,
+                profit_factor=excluded.profit_factor,
+                posterior_lcb_r=excluded.posterior_lcb_r,
+                max_drawdown_r=excluded.max_drawdown_r,
+                tail_10_r=excluded.tail_10_r,
+                final_score=excluded.final_score,
+                size_mult=excluded.size_mult,
+                hard_vetoes=excluded.hard_vetoes,
+                payload_hash=excluded.payload_hash,
+                slim_payload=excluded.slim_payload;
+        """, (
+            k, now_iso(), VERSION, d.get("id"),
+            d.get("symbol"), d.get("side"), d.get("setup"), d.get("profile"), d.get("horizon_min"),
+            d.get("lifecycle_state"), d.get("confidence_state"), d.get("sample_n"), d.get("live_n"),
+            d.get("expectancy_r"), d.get("profit_factor"), d.get("posterior_lcb_r"),
+            d.get("max_drawdown_r"), d.get("tail_10_r"), d.get("final_score"), d.get("size_mult"),
+            d.get("hard_vetoes"), h, slim,
+        ))
+
+    return {"state": "OK", "rollup_n": len(latest)}
+
+
+def count(cur, table):
+    if not exists(cur, table):
+        return 0
+    return cur.execute(f"SELECT COUNT(*) FROM {table};").fetchone()[0]
+
+
+def retain_latest(cur, table, keep_n):
+    if not exists(cur, table):
+        return {"table": table, "state": "NO_TABLE"}
+
+    before = count(cur, table)
+
+    cur.execute(f"""
+        DELETE FROM {table}
+        WHERE id NOT IN (
+            SELECT id FROM {table}
+            ORDER BY id DESC
+            LIMIT ?
+        );
+    """, (keep_n,))
+
+    after = count(cur, table)
+
+    cur.execute("""
+        INSERT INTO alpha_storage_guard_v16 (
+            ts, version, table_name, before_n, after_n, retained_n, action, payload
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, (
+        now_iso(),
+        VERSION,
+        table,
+        before,
+        after,
+        keep_n,
+        "RETAIN_LATEST_N_AFTER_ROLLUP",
+        stable_json({"deleted": max(0, before - after)}),
+    ))
+
+    return {"table": table, "before": before, "after": after, "keep_n": keep_n}
+
+
+def main():
+    con = connect()
+    cur = con.cursor()
+    ensure(cur)
+
+    compression = [
+        compress_existing_payloads(cur, "alpha_research_v16", 8000),
+        compress_existing_payloads(cur, "alpha_setup_registry_v16", 8000),
+    ]
+
+    research_rollup = rebuild_research_rollup(cur)
+    registry_rollup = rebuild_registry_rollup(cur)
+
+    retention_limits = {
+        "alpha_research_v16": 3000,
+        "alpha_setup_registry_v16": 3000,
+        "alpha_feature_attribution_v16": 6000,
+        "alpha_feature_store_v16": 3000,
+        "alpha_data_contract_v16": 1500,
+        "alpha_training_matrix_v16": 6000,
+        "liquidation_stream_heartbeat_v16": 5000,
+        "liquidation_events_v16": 30000,
+    }
+
+    retention = []
+    for table, n in retention_limits.items():
+        retention.append(retain_latest(cur, table, n))
+
+    payload_stats = {}
+    if exists(cur, "alpha_payload_library_v16"):
+        row = cur.execute("""
+            SELECT
+                COUNT(*) AS n,
+                ROUND(SUM(raw_bytes)/1024.0/1024.0, 2) AS raw_mb,
+                ROUND(SUM(compressed_bytes)/1024.0/1024.0, 2) AS compressed_mb
+            FROM alpha_payload_library_v16;
+        """).fetchone()
+        payload_stats = dict(row)
+
+    # LOCK_SAFE_V16_3B: commit first, checkpoint later.
+    con.commit()
+    con.close()
+
+    checkpoint_warning = None
+    try:
+        ck = sqlite3.connect(DB, timeout=60)
+        ck.execute("PRAGMA busy_timeout=60000;")
+        ck.execute("PRAGMA wal_checkpoint(PASSIVE);")
+        ck.close()
+    except Exception as e:
+        checkpoint_warning = repr(e)
+
+    print(json.dumps({
+        "version": VERSION,
+        "compression": compression,
+        "research_rollup": research_rollup,
+        "registry_rollup": registry_rollup,
+        "retention": retention,
+        "payload_library": payload_stats,
+        "checkpoint_warning": checkpoint_warning,
+        "note": "DB file size may stay high until offline compact; future growth is controlled.",
+    }, indent=2, default=str))
+
+
+if __name__ == "__main__":
+    main()

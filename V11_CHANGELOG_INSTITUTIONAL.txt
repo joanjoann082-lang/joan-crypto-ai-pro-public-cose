@@ -1,0 +1,17 @@
+V11 Institutional Single-Order Decision Kernel
+
+Added:
+- Canonical ordered stimulus journal with flow_hash.
+- Overlap guard to block V11 if legacy/V9/V10 execution is already active.
+- V11 final control plane as single authority.
+- V11 isolated paper micro-canary bridge.
+- V11 feedback and KPI loop separated from V10.
+- V11 paid API readiness gate.
+- V11 runtime with explicit data -> edge -> regime -> control -> execution -> feedback order.
+- V11 audit/start/status scripts.
+
+Unchanged:
+- V9/V10 files retained as fallback.
+- Legacy tables decisions/positions/trades protected.
+- No paid API integration activated.
+- No real exchange execution enabled.

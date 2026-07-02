@@ -1,0 +1,703 @@
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+
+ROOT = Path(".").resolve()
+HUB = ROOT / "joanbot/market/hub.py"
+DB = ROOT / "joanbot/storage/db.py"
+POLICY = ROOT / "joanbot/storage/storage_policy_v29.py"
+MIGRATION = ROOT / "scripts/migrate_storage_v29.py"
+RUNNER = ROOT / "scripts/run_v29_safe.sh"
+
+
+def ts() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def die(msg: str) -> None:
+    raise SystemExit(f"ERROR: {msg}")
+
+
+def ensure_project() -> None:
+    if not HUB.exists():
+        die(f"Missing {HUB}")
+    if not DB.exists():
+        die(f"Missing {DB}")
+    if not (ROOT / "data/joanbot_v14.sqlite").exists():
+        die("Missing data/joanbot_v14.sqlite")
+
+
+def ensure_no_runner() -> None:
+    out = subprocess.run(
+        "ps -ef | grep python | grep -v grep || true",
+        shell=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+    if out:
+        print("WARNING: Python processes detected:")
+        print(out)
+        die("Stop runners before installing storage layer.")
+
+
+def backup_code() -> Path:
+    b = ROOT / "backups" / f"code_storage_v29_{ts()}"
+    b.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(HUB, b / "hub.py.bak")
+    shutil.copy2(DB, b / "db.py.bak")
+    return b
+
+
+def write_policy() -> None:
+    POLICY.parent.mkdir(parents=True, exist_ok=True)
+
+    POLICY.write_text(r'''from __future__ import annotations
+
+import gzip
+import hashlib
+import json
+import os
+import shutil
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+
+VERSION = "STORAGE_POLICY_V29_INSTITUTIONAL"
+
+
+_RAW_LAST_ARCHIVE: dict[str, float] = {}
+_LAST_PRUNE: dict[str, float] = {}
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _safe_float(x: Any, default: float = 0.0) -> float:
+    try:
+        if x is None:
+            return default
+        return float(x)
+    except Exception:
+        return default
+
+
+def _safe_int(x: Any, default: int = 0) -> int:
+    try:
+        if x is None:
+            return default
+        return int(float(x))
+    except Exception:
+        return default
+
+
+def free_gb(path: Path | str = ".") -> float:
+    try:
+        u = shutil.disk_usage(str(path))
+        return u.free / 1024**3
+    except Exception:
+        return 0.0
+
+
+def _is_writable(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".storage_v29_probe"
+        probe.write_text("ok")
+        probe.unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
+
+
+def detect_archive_root() -> Path:
+    env = os.getenv("JOANBOT_ARCHIVE_DIR")
+    candidates: list[Path] = []
+
+    if env:
+        candidates.append(Path(env))
+
+    candidates.extend([
+        Path("/storage/80A3-16F9/joanbot_archive"),
+        Path("/sdcard/joanbot_archive"),
+        Path("data/cold_archive"),
+    ])
+
+    for c in candidates:
+        if _is_writable(c):
+            return c
+
+    fallback = Path("data/cold_archive")
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def compact_candle(c: Any) -> dict[str, Any]:
+    if not isinstance(c, dict):
+        return {}
+
+    return {
+        "open_time": c.get("open_time"),
+        "close_time": c.get("close_time"),
+        "open": _safe_float(c.get("open")),
+        "high": _safe_float(c.get("high")),
+        "low": _safe_float(c.get("low")),
+        "close": _safe_float(c.get("close")),
+        "volume": _safe_float(c.get("volume")),
+        "quote_volume": _safe_float(c.get("quote_volume")),
+        "trades": _safe_int(c.get("trades")),
+        "taker_buy_base": _safe_float(c.get("taker_buy_base")),
+        "taker_buy_quote": _safe_float(c.get("taker_buy_quote")),
+    }
+
+
+def compact_market_snapshot(snap: dict[str, Any]) -> dict[str, Any]:
+    candles = snap.get("candles") or {}
+    candles_last: dict[str, Any] = {}
+
+    if isinstance(candles, dict):
+        for timeframe, rows in candles.items():
+            if isinstance(rows, list) and rows:
+                candles_last[str(timeframe)] = compact_candle(rows[-1])
+
+    ticker = snap.get("ticker") or {}
+    derivatives = snap.get("derivatives") or {}
+    orderbook = snap.get("orderbook") or {}
+    trades = snap.get("trades") or {}
+    liq = snap.get("liquidations") or {}
+
+    return {
+        "compact": True,
+        "schema": "market_snapshot_compact_v29",
+        "ts": snap.get("ts"),
+        "symbol": snap.get("symbol"),
+        "price": _safe_float(snap.get("price")),
+        "ticker": {
+            "price": _safe_float(ticker.get("price")),
+            "price_change_pct": _safe_float(ticker.get("priceChangePercent")),
+            "volume": _safe_float(ticker.get("volume")),
+            "quote_volume": _safe_float(ticker.get("quoteVolume")),
+        },
+        "candles_last": candles_last,
+        "derivatives": {
+            "funding_rate": _safe_float(derivatives.get("funding_rate")),
+            "open_interest": _safe_float(derivatives.get("open_interest")),
+            "oi_chg_5m": _safe_float(derivatives.get("oi_chg_5m")),
+            "oi_chg_1h": _safe_float(derivatives.get("oi_chg_1h")),
+            "long_short_ratio": _safe_float(derivatives.get("long_short_ratio")),
+            "top_long_short_ratio": _safe_float(derivatives.get("top_long_short_ratio")),
+            "taker_buy_ratio": _safe_float(derivatives.get("taker_buy_sell_ratio")),
+            "basis_bps": _safe_float(derivatives.get("basis_bps")),
+        },
+        "orderflow": {
+            "spread_bps": _safe_float(orderbook.get("spread_bps")),
+            "depth_10bps": _safe_float(orderbook.get("depth_10bps")),
+            "depth_25bps": _safe_float(orderbook.get("depth_25bps")),
+            "imbalance_25bps": _safe_float(orderbook.get("imbalance_25bps")),
+            "wall_pressure": _safe_float(orderbook.get("wall_pressure")),
+            "cvd_proxy": _safe_float(trades.get("cvd_proxy")),
+        },
+        "liquidations": {
+            "count": len(liq) if isinstance(liq, list) else 0,
+        },
+    }
+
+
+def archive_raw_market_snapshot(symbol: str, snap: dict[str, Any], reason: str = "scheduled") -> Optional[Path]:
+    enabled = os.getenv("JOANBOT_ARCHIVE_RAW_MARKET", "1").lower() not in {"0", "false", "no", "off"}
+    if not enabled:
+        return None
+
+    min_free_gb = float(os.getenv("JOANBOT_ARCHIVE_MIN_FREE_GB", "5"))
+    archive_root = detect_archive_root()
+
+    if free_gb(archive_root) < min_free_gb:
+        return None
+
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    safe_symbol = "".join(ch for ch in str(symbol) if ch.isalnum() or ch in "_-")
+    d = archive_root / "market_snapshots" / day
+    d.mkdir(parents=True, exist_ok=True)
+
+    path = d / f"{safe_symbol}.jsonl.gz"
+    record = {
+        "archived_at": utc_now_iso(),
+        "schema": "raw_market_snapshot_v29",
+        "reason": reason,
+        "symbol": symbol,
+        "payload": snap,
+    }
+
+    with gzip.open(path, "at", encoding="utf-8", compresslevel=6) as f:
+        f.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
+        f.write("\n")
+
+    return path
+
+
+def should_archive_raw(symbol: str, reason: str = "scheduled") -> bool:
+    if reason != "scheduled":
+        return True
+
+    interval = int(os.getenv("JOANBOT_RAW_MARKET_INTERVAL_SEC", "1800"))
+    interval = max(300, min(interval, 21600))
+
+    now = time.time()
+    last = _RAW_LAST_ARCHIVE.get(symbol, 0.0)
+
+    if now - last >= interval:
+        _RAW_LAST_ARCHIVE[symbol] = now
+        return True
+
+    return False
+
+
+def prune_market_snapshots(db: Any, symbol: str) -> None:
+    interval = int(os.getenv("JOANBOT_MARKET_PRUNE_INTERVAL_SEC", "300"))
+    now = time.time()
+    last = _LAST_PRUNE.get(symbol, 0.0)
+
+    if now - last < interval:
+        return
+
+    _LAST_PRUNE[symbol] = now
+
+    keep = int(os.getenv("JOANBOT_MARKET_SNAPSHOT_KEEP_PER_SYMBOL", "300"))
+    keep = max(50, min(keep, 2000))
+
+    db.execute(
+        """
+        DELETE FROM market_snapshots
+        WHERE symbol=?
+          AND id NOT IN (
+            SELECT id
+            FROM market_snapshots
+            WHERE symbol=?
+            ORDER BY id DESC
+            LIMIT ?
+          )
+        """,
+        (symbol, symbol, keep),
+    )
+
+
+def enforce_payload_limit(payload: dict[str, Any]) -> dict[str, Any]:
+    max_bytes = int(os.getenv("JOANBOT_SQLITE_MARKET_PAYLOAD_MAX_BYTES", "60000"))
+
+    try:
+        size = len(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    except Exception:
+        return {
+            "compact": True,
+            "schema": "market_snapshot_payload_error_v29",
+        }
+
+    if size <= max_bytes:
+        return payload
+
+    return compact_market_snapshot(payload)
+
+
+def persist_market_snapshot(db: Any, symbol: str, snap: dict[str, Any], price: float, reason: str = "scheduled") -> None:
+    """
+    Main institutional storage entrypoint.
+
+    Keeps full live snapshot available for strategy in memory.
+    Writes only compact payload to hot SQLite.
+    Archives raw full payload out of SQLite on a controlled schedule.
+    Applies hard retention to prevent storage death.
+    """
+    symbol = str(symbol)
+
+    if should_archive_raw(symbol, reason=reason):
+        try:
+            archive_raw_market_snapshot(symbol, snap, reason=reason)
+        except Exception:
+            pass
+
+    compact = compact_market_snapshot(snap)
+    compact = enforce_payload_limit(compact)
+
+    db.insert_json(
+        "market_snapshots",
+        compact,
+        {
+            "ts": snap.get("ts"),
+            "symbol": symbol,
+            "price": price,
+        },
+    )
+
+    try:
+        prune_market_snapshots(db, symbol)
+    except Exception:
+        pass
+''')
+
+    print(f"WROTE {POLICY}")
+
+
+def patch_hub() -> None:
+    s = HUB.read_text()
+
+    if "storage_policy_v29 import persist_market_snapshot" not in s:
+        lines = s.splitlines()
+        insert_at = 0
+        for i, line in enumerate(lines[:80]):
+            if line.startswith("import ") or line.startswith("from "):
+                insert_at = i + 1
+
+        lines.insert(insert_at, "from joanbot.storage.storage_policy_v29 import persist_market_snapshot")
+        s = "\n".join(lines) + "\n"
+
+    pattern = re.compile(
+        r"self\.db\.insert_json\(\s*['\"]market_snapshots['\"]\s*,\s*snap\s*,\s*\{[^{}]*?['\"]price['\"]\s*:\s*price[^{}]*?\}\s*\)"
+    )
+
+    replacement = 'persist_market_snapshot(self.db, symbol, snap, price, reason="scheduled")'
+
+    s2, n = pattern.subn(replacement, s, count=1)
+
+    if n == 0 and replacement not in s:
+        die("Could not patch hub.py market_snapshots insert. Manual inspection required.")
+
+    HUB.write_text(s2)
+    print("PATCHED hub.py")
+
+
+def patch_db_guard() -> None:
+    s = DB.read_text()
+
+    if "DB_PAYLOAD_GUARD_V29" not in s:
+        marker = "\nclass DB:"
+        if marker not in s:
+            die("class DB not found in db.py")
+
+        helper = r'''
+# === DB_PAYLOAD_GUARD_V29 ===
+def _v29_payload_guard(table, obj):
+    if table != "market_snapshots":
+        return obj
+
+    try:
+        import json as _json_v29
+        from joanbot.storage.storage_policy_v29 import compact_market_snapshot
+
+        max_bytes = int(__import__("os").getenv("JOANBOT_SQLITE_MARKET_PAYLOAD_MAX_BYTES", "60000"))
+        raw = _json_v29.dumps(obj, ensure_ascii=False, sort_keys=True).encode("utf-8")
+
+        if len(raw) <= max_bytes:
+            return obj
+
+        if isinstance(obj, dict):
+            return compact_market_snapshot(obj)
+
+        return {
+            "compact": True,
+            "schema": "market_snapshot_non_dict_guard_v29",
+            "type": type(obj).__name__,
+        }
+    except Exception:
+        return {
+            "compact": True,
+            "schema": "market_snapshot_guard_exception_v29",
+            "type": type(obj).__name__,
+        }
+# === END_DB_PAYLOAD_GUARD_V29 ===
+
+'''
+        s = s.replace(marker, "\n" + helper + "class DB:", 1)
+
+    old = "json.dumps(obj, ensure_ascii=False, sort_keys=True)"
+    new = "json.dumps(_v29_payload_guard(table, obj), ensure_ascii=False, sort_keys=True)"
+
+    if new not in s:
+        if old not in s:
+            die("Could not find json.dumps(obj...) in db.py insert_json")
+        s = s.replace(old, new, 1)
+
+    DB.write_text(s)
+    print("PATCHED db.py guard")
+
+
+def write_migration() -> None:
+    MIGRATION.write_text(r'''from __future__ import annotations
+
+import gzip
+import hashlib
+import json
+import sqlite3
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from joanbot.storage.storage_policy_v29 import compact_market_snapshot, detect_archive_root
+
+
+DB = Path("data/joanbot_v14.sqlite")
+KEEP_PER_SYMBOL = 300
+
+
+def gb(n: int) -> float:
+    return round(n / 1024**3, 3)
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def parse_payload(raw: str):
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {
+            "compact": True,
+            "schema": "unparseable_payload_v29",
+            "raw_len": len(raw or ""),
+        }
+
+
+def main() -> None:
+    if not DB.exists():
+        raise SystemExit(f"DB_NOT_FOUND: {DB}")
+
+    root = detect_archive_root()
+    mig_dir = root / "migrations"
+    mig_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    export_path = mig_dir / f"market_snapshots_full_export_before_prune_{ts}.jsonl.gz"
+
+    print("=== STORAGE V29 MIGRATION ===")
+    print("DB:", DB)
+    print("DB_SIZE_BEFORE_GB:", gb(DB.stat().st_size))
+    print("ARCHIVE_ROOT:", root)
+    print("EXPORT:", export_path)
+
+    con = sqlite3.connect(str(DB), timeout=120)
+    con.row_factory = sqlite3.Row
+
+    total = con.execute("SELECT COUNT(*) c FROM market_snapshots").fetchone()["c"]
+    meta = con.execute(
+        "SELECT MIN(ts) min_ts, MAX(ts) max_ts, COUNT(DISTINCT symbol) symbols FROM market_snapshots"
+    ).fetchone()
+
+    print("ROWS_BEFORE:", total)
+    print("MIN_TS:", meta["min_ts"])
+    print("MAX_TS:", meta["max_ts"])
+    print("SYMBOLS:", meta["symbols"])
+
+    print("EXPORT_START")
+    t0 = time.time()
+    count = 0
+
+    with gzip.open(export_path, "wt", encoding="utf-8", compresslevel=6) as out:
+        cur = con.execute("SELECT id, ts, symbol, price, payload FROM market_snapshots ORDER BY id")
+        for r in cur:
+            payload = str(r["payload"] or "null").strip()
+
+            prefix = json.dumps(
+                {
+                    "id": r["id"],
+                    "ts": r["ts"],
+                    "symbol": r["symbol"],
+                    "price": r["price"],
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+
+            out.write(prefix[:-1])
+            out.write(',"payload":')
+
+            if payload.startswith("{") or payload.startswith("["):
+                out.write(payload)
+            else:
+                out.write(json.dumps(payload, ensure_ascii=False))
+
+            out.write("}\n")
+
+            count += 1
+            if count % 1000 == 0:
+                print("exported", count, "/", total)
+
+    print("EXPORT_DONE:", count)
+    print("EXPORT_SECONDS:", round(time.time() - t0, 1))
+    print("EXPORT_SIZE_GB:", gb(export_path.stat().st_size))
+
+    print("VERIFY_START")
+    verify = 0
+    with gzip.open(export_path, "rt", encoding="utf-8") as f:
+        for _ in f:
+            verify += 1
+
+    print("VERIFY_LINES:", verify)
+
+    if verify != total:
+        raise SystemExit(f"VERIFY_FAILED {verify} != {total}")
+
+    sha = sha256_file(export_path)
+    manifest = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "schema": "storage_v29_migration_manifest",
+        "source_db": str(DB),
+        "source_db_size_gb_before": gb(DB.stat().st_size),
+        "rows_exported": count,
+        "rows_verified": verify,
+        "min_ts": meta["min_ts"],
+        "max_ts": meta["max_ts"],
+        "distinct_symbols": meta["symbols"],
+        "export_file": str(export_path),
+        "export_size_bytes": export_path.stat().st_size,
+        "sha256": sha,
+        "keep_per_symbol_after_prune": KEEP_PER_SYMBOL,
+    }
+
+    manifest_path = export_path.with_suffix(export_path.suffix + ".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+
+    print("MANIFEST:", manifest_path)
+    print("SHA256:", sha)
+
+    print("BUILD_KEEP_SET")
+    con.execute("DROP TABLE IF EXISTS temp.keep_market_ids")
+    con.execute("CREATE TEMP TABLE keep_market_ids (id INTEGER PRIMARY KEY)")
+
+    symbols = [r["symbol"] for r in con.execute("SELECT DISTINCT symbol FROM market_snapshots WHERE symbol IS NOT NULL")]
+
+    keep_ids = []
+    for sym in symbols:
+        rows = con.execute(
+            """
+            SELECT id
+            FROM market_snapshots
+            WHERE symbol=?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (sym, KEEP_PER_SYMBOL),
+        ).fetchall()
+        keep_ids.extend([r["id"] for r in rows])
+
+    con.executemany("INSERT OR IGNORE INTO keep_market_ids(id) VALUES (?)", [(i,) for i in keep_ids])
+    con.commit()
+
+    print("KEEP_IDS:", len(set(keep_ids)))
+
+    print("COMPACT_REMAINING_ROWS")
+    cur = con.execute(
+        """
+        SELECT id, payload
+        FROM market_snapshots
+        WHERE id IN (SELECT id FROM keep_market_ids)
+        """
+    )
+
+    updates = []
+    for r in cur:
+        payload = parse_payload(r["payload"] or "")
+        if isinstance(payload, dict):
+            compact = compact_market_snapshot(payload)
+        else:
+            compact = {
+                "compact": True,
+                "schema": "non_dict_remaining_payload_v29",
+            }
+
+        updates.append((json.dumps(compact, ensure_ascii=False, sort_keys=True), r["id"]))
+
+    con.executemany("UPDATE market_snapshots SET payload=? WHERE id=?", updates)
+    con.commit()
+
+    print("DELETE_OLD_ROWS_START")
+    con.execute("DELETE FROM market_snapshots WHERE id NOT IN (SELECT id FROM keep_market_ids)")
+    con.commit()
+
+    print("COUNTS_AFTER_DELETE:")
+    for r in con.execute("SELECT symbol, COUNT(*) c, MIN(ts) min_ts, MAX(ts) max_ts FROM market_snapshots GROUP BY symbol"):
+        print(dict(r))
+
+    print("CHECKPOINT")
+    try:
+        con.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    except Exception:
+        pass
+
+    print("VACUUM_START")
+    t1 = time.time()
+    con.execute("VACUUM;")
+    con.execute("PRAGMA optimize;")
+    con.close()
+
+    print("VACUUM_SECONDS:", round(time.time() - t1, 1))
+    print("DB_SIZE_AFTER_GB:", gb(DB.stat().st_size))
+    print("STORAGE_V29_MIGRATION_OK")
+
+
+if __name__ == "__main__":
+    main()
+''')
+
+    print(f"WROTE {MIGRATION}")
+
+
+def write_runner() -> None:
+    RUNNER.write_text(r'''#!/data/data/com.termux/files/usr/bin/bash
+set -e
+
+cd ~/storage/downloads/joan_crypto_ai_pro_v14 2>/dev/null || cd /storage/emulated/0/Download/joan_crypto_ai_pro_v14
+export PYTHONPATH=$PWD
+
+export JOANBOT_ARCHIVE_RAW_MARKET=1
+export JOANBOT_RAW_MARKET_INTERVAL_SEC=1800
+export JOANBOT_MARKET_SNAPSHOT_KEEP_PER_SYMBOL=300
+export JOANBOT_MARKET_PRUNE_INTERVAL_SEC=300
+export JOANBOT_SQLITE_MARKET_PAYLOAD_MAX_BYTES=60000
+export JOANBOT_ARCHIVE_MIN_FREE_GB=5
+
+FREE_KB=$(df -Pk /storage/emulated | awk 'NR==2 {print $4}')
+MIN_KB=$((8 * 1024 * 1024))
+
+if [ "$FREE_KB" -lt "$MIN_KB" ]; then
+  echo "ABORT: disk free below 8GB"
+  df -h
+  exit 1
+fi
+
+if ps -ef | grep -E "python.*(runner|joanbot)" | grep -v grep >/dev/null; then
+  echo "ABORT: python runner already active"
+  ps -ef | grep -E "python.*(runner|joanbot)" | grep -v grep
+  exit 1
+fi
+
+mkdir -p logs
+
+echo "=== STARTING RUNNER STORAGE V29 SAFE ==="
+date
+
+if [ -f "joanbot/runner.py" ]; then
+  nohup python -u joanbot/runner.py > logs/runner_v29_safe.log 2>&1 &
+elif python - <<'PY'
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec("joanbot.runner") else 1)
