@@ -1,6 +1,6 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-02T20:47:43.394056+00:00
+updated_utc: 2026-07-02T20:49:47.290234+00:00
 
 PROCESS:
 
@@ -54,11 +54,11 @@ GUARD_LAST:
 {"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:56:34.188092+00:00"}
 
 NUCLI QUANTITATIU NET:
-comptadors: {"auditoria_quant_neta": 38, "estat_promocio_quant": 0, "exclusions_qualitat_dades": 1, "memoria_edge_neta": 79, "resultats_quant_nets": 6358}
+comptadors: {"auditoria_quant_neta": 40, "estat_promocio_quant": 86, "exclusions_qualitat_dades": 1, "memoria_edge_neta": 103, "resultats_quant_nets": 6358}
 qualitat: [{"font": "LIVE", "n": 1, "qualitat": "EXCLOS"}, {"font": "FORWARD", "n": 6341, "qualitat": "NET"}, {"font": "LIVE", "n": 16, "qualitat": "NET"}]
-estats: []
-top_executable: []
-quarantena: []
+estats: [{"estat": "RECERCA", "forward_exp": 0.07271, "live_exp": -0.06182, "n": 59}, {"estat": "QUARANTENA", "forward_exp": -0.02214, "live_exp": -0.12779, "n": 18}, {"estat": "EXPLORAR", "forward_exp": 0.1718, "live_exp": 0.03629, "n": 9}]
+top_executable: [{"estat": "EXPLORAR", "forward_exp": 0.0488, "forward_n": 2016.0, "key": "SYM_SIDE|ETHUSDT|SHORT", "live_exp": 0.4315, "live_n": 2.0, "score": 61.59, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.0068, "forward_n": 3981.0, "key": "SIDE|SHORT", "live_exp": 0.2266, "live_n": 7.0, "score": 60.4, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.1884, "forward_n": 1934.0, "key": "SIDE_REGIME|LONG|TRENDING_BULL", "live_exp": 0.0, "live_n": 0.0, "score": 26.49, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.292, "forward_n": 681.0, "key": "SETUP|BTCUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL", "live_exp": 0.0, "live_n": 0.0, "score": 24.27, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.292, "forward_n": 681.0, "key": "SYM_SIDE_REGIME|BTCUSDT|LONG|TRENDING_BULL", "live_exp": 0.0, "live_n": 0.0, "score": 24.27, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.2361, "forward_n": 680.0, "key": "SIDE_REGIME|SHORT|UNKNOWN", "live_exp": 0.0, "live_n": 0.0, "score": 24.27, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.132, "forward_n": 1253.0, "key": "SETUP|ETHUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL", "live_exp": 0.0, "live_n": 0.0, "score": 15.8, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.132, "forward_n": 1253.0, "key": "SYM_SIDE_REGIME|ETHUSDT|LONG|TRENDING_BULL", "live_exp": 0.0, "live_n": 0.0, "score": 15.8, "size": 12000.0}, {"estat": "EXPLORAR", "forward_exp": 0.218, "forward_n": 827.0, "key": "SYM_SIDE|BTCUSDT|LONG", "live_exp": -0.3314, "live_n": 4.0, "score": 1.91, "size": 12000.0}, {"estat": "RECERCA", "forward_exp": 0.0, "forward_n": 0.0, "key": "SETUP|ETHUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|US|NORMAL|LOW", "live_exp": 0.4315, "live_n": 2.0, "score": 42.6, "size": 8000.0}]
+quarantena: [{"forward_exp": 0.0115, "forward_n": 1533.0, "key": "SYM_SIDE|ETHUSDT|LONG", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.012, "forward_n": 49.0, "key": "SETUP|ETHUSDT|LONG|CAPITULATION_REBOUND_LONG|TRENDING_BEAR", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.012, "forward_n": 49.0, "key": "SYM_SIDE_REGIME|ETHUSDT|LONG|TRENDING_BEAR", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": -0.029, "forward_n": 55.0, "key": "SIDE_REGIME|LONG|TRENDING_BEAR", "live_exp": -0.5926, "live_n": 9.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.0839, "forward_n": 2360.0, "key": "SIDE|LONG", "live_exp": -0.5926, "live_n": 9.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.0355, "forward_n": 6341.0, "key": "GLOBAL", "live_exp": -0.2342, "live_n": 16.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": -0.0674, "forward_n": 1016.0, "key": "SETUP|ETHUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL|US|NORMAL|LOW", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.0674, "forward_n": 1016.0, "key": "SETUP|ETHUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL|US", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.0362, "forward_n": 1562.0, "key": "SETUP|BTCUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|ASIA|LOW|LOW", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.0362, "forward_n": 1562.0, "key": "SETUP|BTCUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|ASIA", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}]
 
 RUNNER_ERRORS_LAST:
 nohup: ignoring input
