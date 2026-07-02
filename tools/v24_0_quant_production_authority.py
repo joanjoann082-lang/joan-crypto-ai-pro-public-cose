@@ -238,11 +238,12 @@ def latest_price(con: sqlite3.Connection, symbol: str) -> Dict[str, Any]:
             "price": snap.get("price"),
             "ts": snap.get("ts"),
             "age_min": snap.get("age_min"),
-            "source_table": "institutional_v24_9_final_market_data_status",
-            "source_col": "price",
+            "source_table": snap.get("source_table"),
+            "source_col": snap.get("source_col"),
             "reason": snap.get("reason"),
             "canonical": True,
             "source": snap.get("source"),
+            "version": snap.get("version"),
         }
     except Exception as e:
         return {
@@ -253,7 +254,7 @@ def latest_price(con: sqlite3.Connection, symbol: str) -> Dict[str, Any]:
             "age_min": None,
             "source_table": None,
             "source_col": None,
-            "reason": "FINAL_CANONICAL_PRICE_GATE_EXCEPTION:" + repr(e),
+            "reason": "MAX_CANONICAL_PRICE_GATE_EXCEPTION:" + repr(e),
             "canonical": True,
         }
 

@@ -1,3 +1,47 @@
+__pycache__/
+*.pyc
+*.pyo
+*.swp
+*.tmp
+
+.env
+*.key
+*.pem
+secrets/
+
+data/
+logs/
+*.log
+*.pid
+
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+*.bak
+*.backup
+*.old
+*.BROKEN*
+*broken*
+*_before_*
+*_backup_*
+audit_export_*
+
+# Runtime / secrets / heavy state
+data/
+logs/
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+*.pid
+.env
+.env.*
+*_SECRET*
+*TOKEN*
+
+# ===== JOANBOT RUNTIME / LOCAL STATE - DO NOT COMMIT =====
 data/
 *.sqlite
 *.sqlite-shm
@@ -5,33 +49,29 @@ data/
 *.db
 *.log
 *.pid
+*.lock
+*.bak
+*.tmp
+*.cache
+__pycache__/
+*.pyc
 
+# Local secrets / environment
 .env
 .env.*
-*token*
 *secret*
+*token*
 *api_key*
 *apikey*
-*password*
-*credential*
 *.pem
 *.key
 
-*.bak
-*.backup
+# Local exports / generated archives
 *.zip
 *.tar
-*.gz
-backups/
-*_backups/
-*v24_*_backups*/
+*.tar.gz
 
-__pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-.DS_Store
-.idea/
-.vscode/
+# Termux/local runtime noise
+nohup.out
+stdout.log
+stderr.log

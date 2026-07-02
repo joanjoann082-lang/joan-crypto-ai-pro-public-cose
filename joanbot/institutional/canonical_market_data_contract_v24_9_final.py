@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import sqlite3
@@ -8,18 +9,18 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 ROOT = Path("/storage/emulated/0/Download/joan_crypto_ai_pro_v14")
 DB = ROOT / "data" / "joanbot_v14.sqlite"
 
-VERSION = "V24_9_FINAL_INSTITUTIONAL_CANONICAL_MARKET_DATA_CONTRACT"
+VERSION = "V24_9_2_MAX_INSTITUTIONAL_MARKET_DATA_CONTRACT"
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT"]
+SYMBOLS = ("BTCUSDT", "ETHUSDT")
 
 LATEST_TABLE = "institutional_v24_market_price_latest"
-STATUS_TABLE = "institutional_v24_9_final_market_data_status"
-AUDIT_TABLE = "institutional_v24_9_final_market_data_audit"
+STATUS_TABLE = "institutional_v24_9_max_market_data_status"
+AUDIT_TABLE = "institutional_v24_9_max_market_data_audit"
 
 BINANCE_FAPI_PREMIUM = "https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}"
 
@@ -41,7 +42,10 @@ def parse_ts(x: Any) -> Optional[datetime]:
     if not x:
         return None
     try:
-        return datetime.fromisoformat(str(x).replace("Z", "+00:00")).astimezone(timezone.utc)
+        d = datetime.fromisoformat(str(x).replace("Z", "+00:00"))
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return d.astimezone(timezone.utc)
     except Exception:
         return None
 
@@ -80,24 +84,34 @@ def table_exists(con: sqlite3.Connection, table: str) -> bool:
     ).fetchone() is not None
 
 
-def cols(con: sqlite3.Connection, table: str):
+def table_info(con: sqlite3.Connection, table: str) -> List[Dict[str, Any]]:
     if not table_exists(con, table):
         return []
-    return [r[1] for r in con.execute(f"PRAGMA table_info({qid(table)})")]
+    return [dict(r) for r in con.execute(f"PRAGMA table_info({qid(table)})")]
+
+
+def cols(con: sqlite3.Connection, table: str) -> List[str]:
+    return [r["name"] for r in table_info(con, table)]
+
+
+def ensure_col(con: sqlite3.Connection, table: str, name: str, typ: str) -> None:
+    if name not in cols(con, table):
+        con.execute(f"ALTER TABLE {qid(table)} ADD COLUMN {qid(name)} {typ}")
 
 
 def ensure_tables(con: sqlite3.Connection) -> None:
     con.execute(f"""
     CREATE TABLE IF NOT EXISTS {qid(LATEST_TABLE)} (
         symbol TEXT PRIMARY KEY,
-        ts TEXT,
-        price REAL,
-        source TEXT,
+        ts TEXT NOT NULL,
+        version TEXT NOT NULL,
+        price REAL NOT NULL,
+        source TEXT NOT NULL,
         source_table TEXT,
         source_col TEXT,
         source_ts TEXT,
         source_age_min REAL,
-        reason TEXT,
+        reason TEXT NOT NULL,
         confidence REAL,
         payload TEXT
     )
@@ -106,10 +120,11 @@ def ensure_tables(con: sqlite3.Connection) -> None:
     con.execute(f"""
     CREATE TABLE IF NOT EXISTS {qid(STATUS_TABLE)} (
         symbol TEXT PRIMARY KEY,
-        ts TEXT,
-        ok INTEGER,
+        ts TEXT NOT NULL,
+        version TEXT NOT NULL,
+        ok INTEGER NOT NULL,
         price REAL,
-        reason TEXT,
+        reason TEXT NOT NULL,
         source TEXT,
         source_ts TEXT,
         source_age_min REAL,
@@ -126,12 +141,12 @@ def ensure_tables(con: sqlite3.Connection) -> None:
     con.execute(f"""
     CREATE TABLE IF NOT EXISTS {qid(AUDIT_TABLE)} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts TEXT,
-        version TEXT,
-        symbol TEXT,
-        accepted INTEGER,
+        ts TEXT NOT NULL,
+        version TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        accepted INTEGER NOT NULL,
         price REAL,
-        reason TEXT,
+        reason TEXT NOT NULL,
         source TEXT,
         source_ts TEXT,
         source_age_min REAL,
@@ -145,50 +160,159 @@ def ensure_tables(con: sqlite3.Connection) -> None:
     )
     """)
 
-    for table in [LATEST_TABLE]:
-        existing = set(cols(con, table))
-        needed = {
-            "symbol": "TEXT",
-            "ts": "TEXT",
-            "price": "REAL",
-            "source": "TEXT",
-            "source_table": "TEXT",
-            "source_col": "TEXT",
-            "source_ts": "TEXT",
-            "source_age_min": "REAL",
-            "reason": "TEXT",
-            "confidence": "REAL",
-            "payload": "TEXT",
-        }
-        for name, typ in needed.items():
-            if name not in existing:
-                con.execute(f"ALTER TABLE {qid(table)} ADD COLUMN {qid(name)} {typ}")
+    common = {
+        "version": "TEXT",
+        "source": "TEXT",
+        "source_table": "TEXT",
+        "source_col": "TEXT",
+        "source_ts": "TEXT",
+        "source_age_min": "REAL",
+        "confidence": "REAL",
+        "payload": "TEXT",
+        "mark_price": "REAL",
+        "index_price": "REAL",
+        "mark_index_divergence": "REAL",
+        "previous_canonical_price": "REAL",
+        "previous_canonical_ts": "TEXT",
+        "jump_pct": "REAL",
+    }
+
+    for table in (LATEST_TABLE, STATUS_TABLE, AUDIT_TABLE):
+        if not table_exists(con, table):
+            continue
+        for name, typ in common.items():
+            if name not in cols(con, table):
+                try:
+                    ensure_col(con, table, name, typ)
+                except Exception:
+                    pass
+
+
+def default_for_column(name: str, typ: str, values: Dict[str, Any]) -> Any:
+    n = str(name).lower()
+    t = str(typ or "").upper()
+    now = values.get("ts") or utc_now()
+
+    if n == "version":
+        return VERSION
+    if n == "ts":
+        return now
+    if n == "symbol":
+        return values.get("symbol") or "UNKNOWN"
+    if n == "ok":
+        return 1 if values.get("ok") else 0
+    if n == "accepted":
+        return 1 if values.get("accepted") else 0
+    if n == "price":
+        return float(values.get("price") or 0.0)
+    if n in {"reason", "status"}:
+        return values.get("reason") or "CANONICAL_PRICE_OK"
+    if n in {"source", "source_name"}:
+        return values.get("source") or "BINANCE_FAPI_PREMIUM_INDEX"
+    if n == "source_table":
+        return values.get("source_table") or "BINANCE_FAPI_PREMIUM_INDEX"
+    if n == "source_col":
+        return values.get("source_col") or "markPrice"
+    if n == "source_ts":
+        return values.get("source_ts") or now
+    if n == "source_age_min":
+        return float(values.get("source_age_min") or 0.0)
+    if n == "confidence":
+        return float(values.get("confidence") or 0.0)
+    if n == "payload":
+        return values.get("payload") or "{}"
+    if n in {"mark_price", "index_price", "mark_index_divergence", "previous_canonical_price", "jump_pct"}:
+        return float(values.get(n) or 0.0)
+    if n == "previous_canonical_ts":
+        return values.get("previous_canonical_ts") or ""
+    if n in {"created_at", "updated_at", "last_seen_at"}:
+        return now
+    if n == "id":
+        return None
+
+    if "INT" in t:
+        return 0
+    if any(x in t for x in ("REAL", "FLOA", "DOUB", "NUM", "DEC")):
+        return 0.0
+    if "BLOB" in t:
+        return b""
+
+    return f"V24_9_2_MAX_DEFAULT_{name}"
+
+
+def row_for_table(con: sqlite3.Connection, table: str, values: Dict[str, Any]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+
+    for col in table_info(con, table):
+        name = col["name"]
+        typ = col.get("type") or ""
+        notnull = int(col.get("notnull") or 0) == 1
+        pk = int(col.get("pk") or 0) == 1
+        dflt = col.get("dflt_value")
+
+        if pk and name.lower() == "id":
+            continue
+
+        if name in values:
+            out[name] = values[name]
+            continue
+
+        if notnull and dflt is None:
+            v = default_for_column(name, typ, values)
+            if v is not None:
+                out[name] = v
+
+    existing = {c["name"] for c in table_info(con, table)}
+    for k, v in values.items():
+        if k in existing:
+            out[k] = v
+
+    return out
+
+
+def insert_dynamic(con: sqlite3.Connection, table: str, values: Dict[str, Any]) -> None:
+    data = row_for_table(con, table, values)
+    if not data:
+        raise RuntimeError(f"NO_INSERTABLE_COLUMNS:{table}")
+
+    names = list(data.keys())
+    con.execute(
+        f"""
+        INSERT INTO {qid(table)}
+        ({",".join(qid(n) for n in names)})
+        VALUES ({",".join("?" for _ in names)})
+        """,
+        [data[n] for n in names],
+    )
+
+
+def replace_by_symbol(con: sqlite3.Connection, table: str, symbol: str, values: Dict[str, Any]) -> None:
+    if "symbol" in cols(con, table):
+        con.execute(f"DELETE FROM {qid(table)} WHERE UPPER(symbol)=?", (symbol.upper(),))
+    insert_dynamic(con, table, values)
 
 
 def previous_final_canonical(con: sqlite3.Connection, symbol: str) -> Optional[Dict[str, Any]]:
     if not table_exists(con, STATUS_TABLE):
         return None
-
     r = con.execute(
         f"""
         SELECT *
         FROM {qid(STATUS_TABLE)}
         WHERE UPPER(symbol)=?
           AND ok=1
+          AND version=?
           AND source='BINANCE_FAPI_PREMIUM_INDEX'
           AND price IS NOT NULL
         """,
-        (symbol.upper(),),
+        (symbol.upper(), VERSION),
     ).fetchone()
-
     if not r:
         return None
-
     d = dict(r)
     p = fnum(d.get("price"))
     if p is None or p <= 0:
         return None
-
     return d
 
 
@@ -200,7 +324,6 @@ def fetch_binance(symbol: str) -> Dict[str, Any]:
         raw = resp.read().decode("utf-8")
 
     data = json.loads(raw)
-
     mark = fnum(data.get("markPrice"))
     index = fnum(data.get("indexPrice"))
 
@@ -211,8 +334,8 @@ def fetch_binance(symbol: str) -> Dict[str, Any]:
         price = mark
         source_col = "markPrice"
 
-    event_ms = data.get("time")
     source_ts = utc_now()
+    event_ms = data.get("time")
     if event_ms is not None:
         try:
             source_ts = datetime.fromtimestamp(float(event_ms) / 1000.0, tz=timezone.utc).isoformat()
@@ -230,7 +353,7 @@ def fetch_binance(symbol: str) -> Dict[str, Any]:
         "index_price": index,
         "mark_index_divergence": div,
         "source": "BINANCE_FAPI_PREMIUM_INDEX",
-        "source_table": None,
+        "source_table": "BINANCE_FAPI_PREMIUM_INDEX",
         "source_col": source_col,
         "source_ts": source_ts,
         "source_age_min": age_min(source_ts),
@@ -238,35 +361,36 @@ def fetch_binance(symbol: str) -> Dict[str, Any]:
     }
 
 
-def validate_candidate(con: sqlite3.Connection, candidate: Dict[str, Any]) -> Dict[str, Any]:
-    sym = candidate["symbol"]
-    price = fnum(candidate.get("price"))
-    mark = fnum(candidate.get("mark_price"))
-    index = fnum(candidate.get("index_price"))
-    source_age = candidate.get("source_age_min")
-    div = candidate.get("mark_index_divergence")
+def validate_candidate(con: sqlite3.Connection, c: Dict[str, Any]) -> Dict[str, Any]:
+    sym = c["symbol"]
+    price = fnum(c.get("price"))
+    mark = fnum(c.get("mark_price"))
+    index = fnum(c.get("index_price"))
+    source_age = c.get("source_age_min")
+    div = c.get("mark_index_divergence")
 
     if price is None or price <= 0:
-        return {**candidate, "ok": False, "reason": "PRIMARY_PRICE_NULL_OR_NON_POSITIVE"}
+        return {**c, "ok": False, "reason": "PRIMARY_PRICE_NULL_OR_NON_POSITIVE"}
 
     if source_age is None or source_age > MAX_SOURCE_AGE_MIN:
-        return {**candidate, "ok": False, "reason": "PRIMARY_PRICE_STALE"}
+        return {**c, "ok": False, "reason": "PRIMARY_PRICE_STALE"}
 
     if mark is None or index is None or mark <= 0 or index <= 0:
-        return {**candidate, "ok": False, "reason": "PRIMARY_MARK_INDEX_INCOMPLETE"}
+        return {**c, "ok": False, "reason": "PRIMARY_MARK_INDEX_INCOMPLETE"}
 
     if div is None or div > MAX_MARK_INDEX_DIVERGENCE:
-        return {**candidate, "ok": False, "reason": "PRIMARY_MARK_INDEX_DIVERGENCE_TOO_HIGH"}
+        return {**c, "ok": False, "reason": "PRIMARY_MARK_INDEX_DIVERGENCE_TOO_HIGH"}
 
     prev = previous_final_canonical(con, sym)
     jump = None
+
     if prev:
         prev_price = fnum(prev.get("price"))
         if prev_price and prev_price > 0:
             jump = abs(price - prev_price) / prev_price
             if jump > MAX_CANONICAL_JUMP_PCT:
                 return {
-                    **candidate,
+                    **c,
                     "ok": False,
                     "reason": "PRIMARY_PRICE_JUMP_OUTLIER_FROM_FINAL_CANONICAL",
                     "previous_canonical_price": prev_price,
@@ -275,7 +399,7 @@ def validate_candidate(con: sqlite3.Connection, candidate: Dict[str, Any]) -> Di
                 }
 
     return {
-        **candidate,
+        **c,
         "ok": True,
         "reason": "CANONICAL_PRICE_OK",
         "previous_canonical_price": fnum(prev.get("price")) if prev else None,
@@ -288,179 +412,91 @@ def reject_result(symbol: str, reason: str, payload: Dict[str, Any]) -> Dict[str
     return {
         "symbol": symbol.upper(),
         "ok": False,
+        "accepted": False,
         "price": None,
         "ts": utc_now(),
+        "version": VERSION,
         "reason": reason,
         "source": "BINANCE_FAPI_PREMIUM_INDEX",
-        "source_table": None,
+        "source_table": "BINANCE_FAPI_PREMIUM_INDEX",
         "source_col": None,
         "source_ts": None,
         "source_age_min": None,
+        "confidence": 0.0,
         "mark_price": None,
         "index_price": None,
         "mark_index_divergence": None,
         "previous_canonical_price": None,
         "previous_canonical_ts": None,
         "jump_pct": None,
-        "payload": payload,
+        "payload": json.dumps({"version": VERSION, "payload": payload}, sort_keys=True, default=str),
     }
 
 
 def evaluate_symbol(con: sqlite3.Connection, symbol: str) -> Dict[str, Any]:
     sym = symbol.upper()
-
     try:
         candidate = fetch_binance(sym)
     except Exception as e:
         return reject_result(sym, "PRIMARY_BINANCE_FETCH_FAILED", {"error": repr(e)})
 
     checked = validate_candidate(con, candidate)
+    ok = bool(checked.get("ok"))
+
+    payload = json.dumps(
+        {"version": VERSION, "candidate": checked},
+        sort_keys=True,
+        default=str,
+    )
+
     return {
         "symbol": sym,
-        "ok": bool(checked.get("ok")),
-        "price": checked.get("price") if checked.get("ok") else None,
+        "ok": ok,
+        "accepted": ok,
+        "price": checked.get("price") if ok else None,
         "ts": utc_now(),
+        "version": VERSION,
         "reason": checked.get("reason"),
         "source": checked.get("source"),
-        "source_table": checked.get("source_table"),
+        "source_table": checked.get("source_table") or "BINANCE_FAPI_PREMIUM_INDEX",
         "source_col": checked.get("source_col"),
         "source_ts": checked.get("source_ts"),
         "source_age_min": checked.get("source_age_min"),
+        "confidence": 1.0 if ok else 0.0,
         "mark_price": checked.get("mark_price"),
         "index_price": checked.get("index_price"),
         "mark_index_divergence": checked.get("mark_index_divergence"),
         "previous_canonical_price": checked.get("previous_canonical_price"),
         "previous_canonical_ts": checked.get("previous_canonical_ts"),
         "jump_pct": checked.get("jump_pct"),
-        "payload": checked,
+        "payload": payload,
     }
 
 
 def write_status(con: sqlite3.Connection, result: Dict[str, Any]) -> None:
-    payload = json.dumps(
-        {
-            "version": VERSION,
-            "payload": result.get("payload", {}),
-        },
-        sort_keys=True,
-        default=str,
-    )
-
-    con.execute(f"DELETE FROM {qid(STATUS_TABLE)} WHERE UPPER(symbol)=?", (result["symbol"],))
-    con.execute(
-        f"""
-        INSERT INTO {qid(STATUS_TABLE)}
-        (symbol, ts, ok, price, reason, source, source_ts, source_age_min,
-         mark_price, index_price, mark_index_divergence,
-         previous_canonical_price, previous_canonical_ts, jump_pct, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            result["symbol"],
-            result["ts"],
-            1 if result["ok"] else 0,
-            result["price"],
-            result["reason"],
-            result["source"],
-            result["source_ts"],
-            result["source_age_min"],
-            result["mark_price"],
-            result["index_price"],
-            result["mark_index_divergence"],
-            result["previous_canonical_price"],
-            result["previous_canonical_ts"],
-            result["jump_pct"],
-            payload,
-        ),
-    )
+    replace_by_symbol(con, STATUS_TABLE, result["symbol"], result)
 
 
 def write_latest_if_ok(con: sqlite3.Connection, result: Dict[str, Any]) -> None:
     if not result.get("ok"):
         return
-
-    payload = json.dumps(
-        {
-            "version": VERSION,
-            "source": result.get("source"),
-            "mark_price": result.get("mark_price"),
-            "index_price": result.get("index_price"),
-            "mark_index_divergence": result.get("mark_index_divergence"),
-            "previous_canonical_price": result.get("previous_canonical_price"),
-            "jump_pct": result.get("jump_pct"),
-        },
-        sort_keys=True,
-        default=str,
-    )
-
-    con.execute(f"DELETE FROM {qid(LATEST_TABLE)} WHERE UPPER(symbol)=?", (result["symbol"],))
-    con.execute(
-        f"""
-        INSERT INTO {qid(LATEST_TABLE)}
-        (symbol, ts, price, source, source_table, source_col, source_ts, source_age_min,
-         reason, confidence, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            result["symbol"],
-            result["ts"],
-            result["price"],
-            result["source"],
-            result["source_table"],
-            result["source_col"],
-            result["source_ts"],
-            result["source_age_min"],
-            "CANONICAL_PRICE_OK",
-            1.0,
-            payload,
-        ),
-    )
+    values = dict(result)
+    values["reason"] = "CANONICAL_PRICE_OK"
+    values["confidence"] = 1.0
+    replace_by_symbol(con, LATEST_TABLE, result["symbol"], values)
 
 
 def write_audit(con: sqlite3.Connection, result: Dict[str, Any]) -> None:
-    payload = json.dumps(
-        {
-            "version": VERSION,
-            "payload": result.get("payload", {}),
-        },
-        sort_keys=True,
-        default=str,
-    )
-
-    con.execute(
-        f"""
-        INSERT INTO {qid(AUDIT_TABLE)}
-        (ts, version, symbol, accepted, price, reason, source, source_ts, source_age_min,
-         mark_price, index_price, mark_index_divergence,
-         previous_canonical_price, previous_canonical_ts, jump_pct, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            utc_now(),
-            VERSION,
-            result["symbol"],
-            1 if result["ok"] else 0,
-            result["price"],
-            result["reason"],
-            result["source"],
-            result["source_ts"],
-            result["source_age_min"],
-            result["mark_price"],
-            result["index_price"],
-            result["mark_index_divergence"],
-            result["previous_canonical_price"],
-            result["previous_canonical_ts"],
-            result["jump_pct"],
-            payload,
-        ),
-    )
+    values = dict(result)
+    values["accepted"] = 1 if result.get("ok") else 0
+    insert_dynamic(con, AUDIT_TABLE, values)
 
 
 def run_once() -> Dict[str, Any]:
     con = connect()
     ensure_tables(con)
 
-    results = {}
+    results: Dict[str, Dict[str, Any]] = {}
     for sym in SYMBOLS:
         result = evaluate_symbol(con, sym)
         write_status(con, result)
@@ -492,7 +528,7 @@ def run_once() -> Dict[str, Any]:
 
     out = ROOT / "data" / "v24_1_market_price_contract"
     out.mkdir(parents=True, exist_ok=True)
-    (out / "v24_9_final_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True, default=str))
+    (out / "v24_9_2_max_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True, default=str))
     print(json.dumps(summary, indent=2, sort_keys=True, default=str))
     return summary
 
@@ -512,8 +548,9 @@ def canonical_price_snapshot(con: sqlite3.Connection, symbol: str) -> Dict[str, 
             "symbol": sym,
             "price": None,
             "age_min": None,
-            "reason": "NO_FINAL_CANONICAL_PRICE_STATUS",
+            "reason": "NO_MAX_CANONICAL_PRICE_STATUS",
             "source": None,
+            "version": VERSION,
         }
 
     d = dict(r)
@@ -522,6 +559,7 @@ def canonical_price_snapshot(con: sqlite3.Connection, symbol: str) -> Dict[str, 
 
     ok = (
         int(d.get("ok") or 0) == 1
+        and d.get("version") == VERSION
         and p is not None
         and p > 0
         and a is not None
@@ -537,10 +575,10 @@ def canonical_price_snapshot(con: sqlite3.Connection, symbol: str) -> Dict[str, 
         "raw_price": p,
         "ts": d.get("ts"),
         "age_min": a,
-        "reason": "CANONICAL_PRICE_OK" if ok else d.get("reason") or "FINAL_CANONICAL_PRICE_INVALID",
+        "reason": "CANONICAL_PRICE_OK" if ok else d.get("reason") or "MAX_CANONICAL_PRICE_INVALID",
         "source": d.get("source"),
-        "source_table": None,
-        "source_col": "markPrice",
+        "source_table": STATUS_TABLE,
+        "source_col": "price",
         "source_ts": d.get("source_ts"),
         "source_age_min": d.get("source_age_min"),
         "mark_price": d.get("mark_price"),
@@ -548,19 +586,18 @@ def canonical_price_snapshot(con: sqlite3.Connection, symbol: str) -> Dict[str, 
         "mark_index_divergence": d.get("mark_index_divergence"),
         "previous_canonical_price": d.get("previous_canonical_price"),
         "jump_pct": d.get("jump_pct"),
+        "version": d.get("version"),
     }
 
 
 def canonical_market_health(con: sqlite3.Connection) -> Dict[str, Any]:
     details = {}
     ok = True
-
     for sym in SYMBOLS:
         snap = canonical_price_snapshot(con, sym)
         details[sym] = snap
         if not snap.get("ok"):
             ok = False
-
     return {
         "ok": ok,
         "reason": "PRICE_OK" if ok else "PRICE_NOT_CANONICAL_OK",
@@ -569,8 +606,6 @@ def canonical_market_health(con: sqlite3.Connection) -> Dict[str, Any]:
 
 
 def main() -> int:
-    import argparse
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--daemon", action="store_true")
@@ -582,7 +617,7 @@ def main() -> int:
             try:
                 run_once()
             except Exception as e:
-                print("V24_9_FINAL_MARKET_DATA_FATAL", repr(e), flush=True)
+                print("V24_9_2_MAX_MARKET_DATA_FATAL", repr(e), flush=True)
             time.sleep(max(10, int(args.interval)))
     else:
         run_once()

@@ -1,0 +1,121 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime, timezone
+
+DB = "data/joanbot_v14.sqlite"
+VERSION = "LIQUIDATION_STREAM_V16_BINANCE_REAL"
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def ensure(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS liquidation_events_v16 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL,
+            event_time INTEGER,
+            symbol TEXT NOT NULL,
+            side TEXT,
+            order_type TEXT,
+            original_qty REAL,
+            price REAL,
+            avg_price REAL,
+            order_status TEXT,
+            trade_time INTEGER,
+            notional_usd REAL,
+            version TEXT NOT NULL,
+            payload TEXT NOT NULL
+        );
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_liq_v16_symbol_ts
+        ON liquidation_events_v16(symbol, ts);
+    """)
+
+
+def store(msg):
+    data = json.loads(msg)
+    o = data.get("o", {})
+    symbol = o.get("s")
+
+    if symbol not in {"BTCUSDT", "ETHUSDT"}:
+        return
+
+    price = float(o.get("p", 0) or 0)
+    qty = float(o.get("q", 0) or 0)
+    avg_price = float(o.get("ap", 0) or 0)
+    notional = (avg_price or price) * qty
+
+    con = sqlite3.connect(DB, timeout=30)
+    cur = con.cursor()
+    ensure(cur)
+
+    cur.execute("""
+        INSERT INTO liquidation_events_v16 (
+            ts, event_time, symbol, side, order_type, original_qty,
+            price, avg_price, order_status, trade_time, notional_usd,
+            version, payload
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    """, (
+        now_iso(),
+        data.get("E"),
+        symbol,
+        o.get("S"),
+        o.get("o"),
+        qty,
+        price,
+        avg_price,
+        o.get("X"),
+        o.get("T"),
+        notional,
+        VERSION,
+        json.dumps(data, separators=(",", ":")),
+    ))
+
+    con.commit()
+    con.close()
+
+
+def main():
+    try:
+        import websocket
+    except Exception as e:
+        print("WEBSOCKET_CLIENT_NOT_AVAILABLE", repr(e))
+        raise SystemExit(2)
+
+    url = "wss://fstream.binance.com/ws/!forceOrder@arr"
+
+    def on_message(ws, message):
+        try:
+            store(message)
+            print("LIQ_V16_STORED")
+        except Exception as e:
+            print("LIQ_V16_STORE_ERROR", repr(e))
+
+    def on_error(ws, error):
+        print("LIQ_V16_WS_ERROR", repr(error))
+
+    def on_close(ws, code, msg):
+        print("LIQ_V16_WS_CLOSED", code, msg)
+
+    def on_open(ws):
+        print("LIQ_V16_WS_OPEN")
+
+    ws = websocket.WebSocketApp(
+        url,
+        on_open=on_open,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close,
+    )
+
+    ws.run_forever(ping_interval=20, ping_timeout=10)
+
+
+if __name__ == "__main__":
+    main()

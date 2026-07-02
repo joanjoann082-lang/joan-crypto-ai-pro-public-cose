@@ -285,7 +285,7 @@ def health_price(con: sqlite3.Connection) -> Dict[str, Any]:
         from joanbot.institutional.canonical_market_data_contract_v24_9_final import canonical_market_health
         return canonical_market_health(con)
     except Exception as e:
-        return {"ok": False, "reason": "FINAL_CANONICAL_MARKET_HEALTH_EXCEPTION", "error": repr(e)}
+        return {"ok": False, "reason": "MAX_CANONICAL_MARKET_HEALTH_EXCEPTION", "error": repr(e)}
 
 
 def health_brain(con: sqlite3.Connection) -> Dict[str, Any]:
