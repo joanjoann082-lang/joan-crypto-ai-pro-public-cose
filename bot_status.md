@@ -1,9 +1,9 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-02T14:54:47.303494+00:00
+updated_utc: 2026-07-02T14:56:49.327677+00:00
 
 PROCESS:
-u0_a197  11170  7643 12  1970 pts/2    00:01:05 python -m joanbot.runner
+u0_a197  14488  7643  7  1970 pts/2    00:00:01 python -m joanbot.runner
 
 HEALTH:
 state: GREEN
@@ -41,8 +41,6 @@ CONTROL:
 }
 
 GUARD_LAST:
-{"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T11:48:34.577303+00:00"}
-{"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T11:48:34.890781+00:00"}
 {"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T11:48:42.717689+00:00"}
 {"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T11:48:43.159361+00:00"}
 {"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:02:18.562011+00:00"}
@@ -51,6 +49,8 @@ GUARD_LAST:
 {"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:34:21.433847+00:00"}
 {"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T14:46:08.226880+00:00"}
 {"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:46:08.229582+00:00"}
+{"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T14:56:34.183073+00:00"}
+{"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:56:34.188092+00:00"}
 
 RUNNER_ERRORS_LAST:
 nohup: ignoring input
