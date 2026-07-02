@@ -1,9 +1,9 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-02T14:44:37.126002+00:00
+updated_utc: 2026-07-02T14:46:39.258309+00:00
 
 PROCESS:
-u0_a197   7117 28606 12  1970 pts/1    00:01:14 python -m joanbot.runner
+u0_a197  11170  7643 18  1970 pts/2    00:00:06 python -m joanbot.runner
 
 HEALTH:
 state: GREEN
@@ -49,6 +49,8 @@ GUARD_LAST:
 {"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T14:02:19.306718+00:00"}
 {"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T14:34:21.428451+00:00"}
 {"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:34:21.433847+00:00"}
+{"event": "MODULE_PATCHED", "guard": "V25_2B_RUNNER_GUARD", "module": "joanbot.execution.broker", "patched": ["joanbot.execution.broker.asdict", "joanbot.execution.broker.get_db", "joanbot.execution.broker.fnum", "joanbot.execution.broker.utc_now_iso", "joanbot.execution.broker.pct", "joanbot.execution.broker.clamp", "joanbot.execution.broker.evaluate_execution", "joanbot.execution.broker.record_execution_rejection", "joanbot.execution.broker.PaperBroker.load_wallet", "joanbot.execution.broker.PaperBroker.refresh", "joanbot.execution.broker.PaperBroker.open_from_decision", "joanbot.execution.broker.PaperBroker._slipped_entry"], "patched_count": 12, "ts": "2026-07-02T14:46:08.226880+00:00"}
+{"event": "GUARD_INSTALLED_FROM_RUNNER", "guard": "V25_2B_RUNNER_GUARD", "ts": "2026-07-02T14:46:08.229582+00:00"}
 
 RUNNER_ERRORS_LAST:
 nohup: ignoring input
