@@ -1,6 +1,6 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-03T07:17:54.838288+00:00
+updated_utc: 2026-07-03T07:20:00.397742+00:00
 
 PROCESS:
 
@@ -61,4 +61,4 @@ top_executable: [{"estat": "EXPLORAR", "forward_exp": 0.0488, "forward_n": 2016.
 quarantena: [{"forward_exp": 0.012, "forward_n": 49.0, "key": "SETUP|ETHUSDT|LONG|CAPITULATION_REBOUND_LONG|TRENDING_BEAR", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.012, "forward_n": 49.0, "key": "SYM_SIDE_REGIME|ETHUSDT|LONG|TRENDING_BEAR", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.0504, "forward_n": 2654.0, "key": "SYM_SIDE|ETHUSDT|LONG", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": -0.029, "forward_n": 55.0, "key": "SIDE_REGIME|LONG|TRENDING_BEAR", "live_exp": -0.5926, "live_n": 9.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.087, "forward_n": 3694.0, "key": "SIDE|LONG", "live_exp": -0.5926, "live_n": 9.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.0454, "forward_n": 7675.0, "key": "GLOBAL", "live_exp": -0.2342, "live_n": 16.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": -0.0362, "forward_n": 1562.0, "key": "SETUP|BTCUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|ASIA|LOW|LOW", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.0362, "forward_n": 1562.0, "key": "SETUP|BTCUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|ASIA", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.0355, "forward_n": 1571.0, "key": "SETUP|ETHUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|ASIA|NORMAL|LOW", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.0355, "forward_n": 1571.0, "key": "SETUP|ETHUSDT|SHORT|TREND_BOUNCE_SHORT|TRENDING_BEAR|ASIA", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}]
 
 RUNNER_ERRORS_LAST:
-nohup: ignoring input
+
