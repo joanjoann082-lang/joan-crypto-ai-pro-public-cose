@@ -1,9 +1,9 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-03T06:39:19.091806+00:00
+updated_utc: 2026-07-03T07:17:54.838288+00:00
 
 PROCESS:
-u0_a197   9292  9291 19  1970 pts/2    00:00:00 /data/data/com.termux/files/usr/bin/python -m py_compile joanbot/institutional/nucli_quantitatiu_net.py joanbot/institutional/aprenentatge_causal_net.py joanbot/intelligence/decision.py joanbot/execution/broker.py joanbot/execution/contract.py joanbot/runner.py tools/prova_nucli_quantitatiu_net.py tools/reconstrueix_nucli_quantitatiu_net.py tools/panell_quantitatiu_net.py tools/configura_entrenament_quantitatiu_net.py tools/publish_status_github_v25_3.py joanbot/institutional/gestio_posicio_institucional_neta.py tools/prova_gestio_posicio_institucional.py tools/reconstrueix_gestio_posicio_institucional.py tools/panell_gestio_posicio_institucional.py
+
 
 HEALTH:
 state: GREEN
