@@ -1,6 +1,6 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-04T08:55:36.541286+00:00
+updated_utc: 2026-07-04T08:57:40.379940+00:00
 
 PROCESS:
 
@@ -69,9 +69,9 @@ File "<frozen runpy>", line 203, in _run_module_as_main
   File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/runner.py", line 116, in main
     def main(): Runner().run()
                 ~~~~~~~~~~~~^^
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/runner.py", line 111, in run
-    self.db.runtime_event('runner','INFO','runner_start_v21',{'symbols':list(CFG.symbols)})
-    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/runner.py", line 115, in run
+    except Exception as e: self.errors.append({'ts':utc_now_iso(),'error':repr(e),'trace':traceback.format_exc(limit=5)}); self.db.runtime_event('runner','ERROR',repr(e),{'trace':traceback.format_exc(limit=3)}); time.sleep(5)
+                                                                                                                           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/storage/db.py", line 127, in runtime_event
     self.insert_json('runtime_events', {'ts': utc_now_iso(), 'component': component, 'level': level, 'message': message, 'payload': payload or {}}, {'ts': utc_now_iso(), 'component': component, 'level': level, 'message': message})
     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
