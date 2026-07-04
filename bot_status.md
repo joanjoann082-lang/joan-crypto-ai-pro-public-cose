@@ -1,9 +1,9 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-04T10:18:04.193663+00:00
+updated_utc: 2026-07-04T10:20:06.419829+00:00
 
 PROCESS:
-
+u0_a197   7372  5584 19  1970 ?        00:00:06 python -m joanbot.runner
 
 HEALTH:
 state: GREEN
@@ -61,23 +61,4 @@ top_executable: [{"estat": "EXPLORAR", "forward_exp": 0.0488, "forward_n": 2016.
 quarantena: [{"forward_exp": 0.012, "forward_n": 49.0, "key": "SETUP|ETHUSDT|LONG|CAPITULATION_REBOUND_LONG|TRENDING_BEAR", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.012, "forward_n": 49.0, "key": "SYM_SIDE_REGIME|ETHUSDT|LONG|TRENDING_BEAR", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.1361, "forward_n": 9815.0, "key": "SYM_SIDE|ETHUSDT|LONG", "live_exp": -0.8014, "live_n": 5.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": -0.029, "forward_n": 55.0, "key": "SIDE_REGIME|LONG|TRENDING_BEAR", "live_exp": -0.5926, "live_n": 9.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.135, "forward_n": 16643.0, "key": "SIDE|LONG", "live_exp": -0.5926, "live_n": 9.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": 0.1103, "forward_n": 20624.0, "key": "GLOBAL", "live_exp": -0.2342, "live_n": 16.0, "vetos": "[\"EDGE_LIVE_NEGATIU\"]"}, {"forward_exp": -0.2742, "forward_n": 624.0, "key": "CAUSA_NIVELL|LONG|TREND_PULLBACK_LONG|RESISTENCIA|SOBRE_EXTREM|SOBRE_EXTREM", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.1908, "forward_n": 1233.0, "key": "SETUP|ETHUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL|LATE_US|NORMAL|LOW", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.1908, "forward_n": 1233.0, "key": "SETUP|ETHUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL|LATE_US", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}, {"forward_exp": -0.1032, "forward_n": 1500.0, "key": "SETUP|BTCUSDT|LONG|TREND_PULLBACK_LONG|TRENDING_BULL|ASIA|LOW|LOW", "live_exp": 0.0, "live_n": 0.0, "vetos": "[\"EDGE_FORWARD_NEGATIU\"]"}]
 
 RUNNER_ERRORS_LAST:
-File "<frozen runpy>", line 203, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/runner.py", line 117, in <module>
-    if __name__=='__main__': main()
-                             ~~~~^^
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/runner.py", line 116, in main
-    def main(): Runner().run()
-                ~~~~~~~~~~~~^^
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/runner.py", line 111, in run
-    self.db.runtime_event('runner','INFO','runner_start_v21',{'symbols':list(CFG.symbols)})
-    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/storage/db.py", line 127, in runtime_event
-    self.insert_json('runtime_events', {'ts': utc_now_iso(), 'component': component, 'level': level, 'message': message, 'payload': payload or {}}, {'ts': utc_now_iso(), 'component': component, 'level': level, 'message': message})
-    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/storage/db.py", line 121, in insert_json
-    self.execute(f"INSERT INTO {table}({','.join(cols)}) VALUES({q})", vals)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/emulated/0/Download/joan_crypto_ai_pro_v14/joanbot/storage/db.py", line 94, in execute
-    cur = self._conn.execute(sql, tuple(params))
-sqlite3.OperationalError: database is locked
+
