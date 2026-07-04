@@ -6,9 +6,10 @@ from ..storage import get_db
 from .data_quality import DataQualityEngine
 from .technical import TechnicalEngine
 from .levels import LevelsEngine
+from ..institutional.aprenentatge_causal_net import MotorAprenentatgeCausalNet
 
 class ContextEngine:
-    def __init__(self): self.quality=DataQualityEngine(); self.tech=TechnicalEngine(); self.levels=LevelsEngine(); self.db=get_db()
+    def __init__(self): self.quality=DataQualityEngine(); self.tech=TechnicalEngine(); self.levels=LevelsEngine(); self.causal=MotorAprenentatgeCausalNet(); self.db=get_db()
     def session(self) -> str:
         h=datetime.now(timezone.utc).hour
         if 0<=h<7: return 'ASIA'
@@ -47,5 +48,6 @@ class ContextEngine:
         vol_bucket='HIGH' if vol_pct>2.0 else 'LOW' if vol_pct<0.55 else 'NORMAL'
         news_sev=fnum(news.get('severity')); news_bucket='HIGH' if news_sev>=70 else 'MEDIUM' if news_sev>=35 else 'LOW'
         ctx={'symbol':symbol,'ts':utc_now_iso(),'price':price,'session':self.session(),'regime':regime,'volatility_bucket':vol_bucket,'news_bucket':news_bucket,'data_quality':q,'technical':tech,'levels':lvl,'micro':{**ob, **trades, 'liquidity_score':liq_score},'derivatives':{**der, **liq, 'derivatives_score':deriv_score},'macro':macro,'news':news,'calendar':cal,'flags':{'late_long':late_long,'late_short':late_short,'squeeze_risk':squeeze_risk}}
+        ctx['mapa_causal']=self.causal.calcula(ctx, symbol_snap.get('candles',{}))
         self.db.insert_json('features', ctx, {'ts':ctx['ts'],'symbol':symbol,'regime':regime,'session':ctx['session'],'volatility_bucket':vol_bucket,'news_bucket':news_bucket,'data_quality':q.get('score',0)})
         return ctx

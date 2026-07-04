@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+
 import time, traceback
 from .config import CFG, STATE_PATH
 from .utils import utc_now_iso, atomic_write_json, fnum
@@ -15,6 +17,7 @@ from .alpha.alpha_meta_governance_v5 import AlphaMetaGovernanceV5
 from .alpha.alpha_bayesian_posterior_v5 import AlphaBayesianPosteriorV5
 from .alpha.alpha_evidence_tensor_v5 import AlphaEvidenceTensorV5
 from .ops.retention_v1 import run_retention_safe
+from .institutional.nucli_quantitatiu_net import get_core as NucliQuantitatiuNet
 
 class Scheduler:
     def __init__(self): self.last={}
@@ -23,7 +26,7 @@ class Scheduler:
         if now-old>=sec: self.last[name]=now; return True
         return False
 class Runner:
-    def __init__(self): self.db=get_db(); self.market=MarketDataHub(); self.context=ContextEngine(); self.kernel=DecisionKernel(); self.edge=EdgeMemory(); self.broker=PaperBroker(); self.guard=ProfitGuard(self.broker); self.forward=ForwardTester(); self.alpha_shadow=UniversalShadowAlphaLoopV2(self.db); self.alpha_tensor=AlphaEvidenceTensorV5(self.db); self.alpha_posterior=AlphaBayesianPosteriorV5(self.db); self.alpha_meta=AlphaMetaGovernanceV5(self.db); self.alpha_contracts=AlphaPromotionContractV5(self.db); self.control_plane=InstitutionalControlPlaneV6(self.db); self.alerts=AlertEngine(); self.s=Scheduler(); self.global_snap={'macro':{'risk_score':50},'news':{'severity':0},'calendar':{}}; self.symbol_snaps={}; self.contexts={}; self.prices={}; self.started=utc_now_iso(); self.cycles=0; self.errors=[]
+    def __init__(self): self.db=get_db(); self.nucli_quant=NucliQuantitatiuNet(self.db); self.market=MarketDataHub(); self.context=ContextEngine(); self.kernel=DecisionKernel(); self.edge=EdgeMemory(); self.broker=PaperBroker(); self.guard=ProfitGuard(self.broker); self.forward=ForwardTester(); self.alpha_shadow=UniversalShadowAlphaLoopV2(self.db); self.alpha_tensor=AlphaEvidenceTensorV5(self.db); self.alpha_posterior=AlphaBayesianPosteriorV5(self.db); self.alpha_meta=AlphaMetaGovernanceV5(self.db); self.alpha_contracts=AlphaPromotionContractV5(self.db); self.control_plane=InstitutionalControlPlaneV6(self.db); self.alerts=AlertEngine(); self.s=Scheduler(); self.global_snap={'macro':{'risk_score':50},'news':{'severity':0},'calendar':{}}; self.symbol_snaps={}; self.contexts={}; self.prices={}; self.started=utc_now_iso(); self.cycles=0; self.errors=[]
     def step_market(self):
         if self.s.due('global',CFG.loop_macro_sec): self.global_snap=self.market.global_snapshot(); self.alerts.evaluate_global(self.global_snap)
         for sym in CFG.symbols:
@@ -95,7 +98,7 @@ class Runner:
 
     def step_forward(self):
         if self.s.due('forward',CFG.loop_forward_sec):
-            for r in self.forward.resolve_due(): self.edge.update_many(self.edge.keys_for(r['symbol'],r['side'],r['setup'],'UNKNOWN','UNKNOWN','UNKNOWN','UNKNOWN'),'FORWARD',fnum(r.get('result_r')),r)
+            for r in self.forward.resolve_due(): self.nucli_quant.registra_forward(r)
     def step_retention(self):
         # Storage hygiene only. No trading decision, no position close, no PnL mutation.
         if self.s.due('retention_v1', int(getattr(CFG, 'loop_retention_sec', 900))):

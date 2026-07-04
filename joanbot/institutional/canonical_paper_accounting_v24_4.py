@@ -238,3 +238,58 @@ def is_exit_outlier(entry: float, exit_price: float, stop: Optional[float], tp: 
 
 def safe_json(x: Any) -> str:
     return json.dumps(x, sort_keys=True, default=str)
+
+
+
+# === PREU_CANONIC_FRESC_V1_ACCOUNTING ===
+# Regla permanent:
+# La comptabilitat paper no pot dependre d'un price table vell si el contracte V24.9 pot donar preu fresc.
+try:
+    _canonical_price_accounting_cache_original = canonical_price
+except Exception:
+    _canonical_price_accounting_cache_original = None
+
+def _preu_accounting_num(x, default=0.0):
+    try:
+        if x is None:
+            return default
+        y = float(x)
+        if y != y:
+            return default
+        return y
+    except Exception:
+        return default
+
+def canonical_price(con, symbol: str):
+    sym = str(symbol).upper()
+
+    try:
+        from joanbot.institutional.canonical_market_data_contract_v24_9_final import evaluate_symbol, canonical_price_snapshot
+
+        for fn in (evaluate_symbol, canonical_price_snapshot):
+            try:
+                r = fn(con, sym)
+                price = _preu_accounting_num(
+                    r.get("price") or r.get("mark_price") or r.get("markPrice") or r.get("raw_price")
+                )
+                if price > 0 and (r.get("accepted", r.get("ok", True))):
+                    meta = dict(r)
+                    meta["symbol"] = sym
+                    meta["price"] = price
+                    meta["source"] = meta.get("source") or "BINANCE_FAPI_PREMIUM_INDEX"
+                    meta["price_contract"] = "PREU_CANONIC_FRESC_V1_ACCOUNTING"
+                    return price, meta
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    if _canonical_price_accounting_cache_original is not None:
+        return _canonical_price_accounting_cache_original(con, sym)
+
+    return None, {
+        "symbol": sym,
+        "ok": False,
+        "reason": "NO_CANONICAL_PRICE_AVAILABLE",
+    }
+

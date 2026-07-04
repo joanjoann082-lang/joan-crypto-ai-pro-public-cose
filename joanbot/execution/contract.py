@@ -10,10 +10,8 @@ CONTRACT_VERSION = "EXECUTION_CONTRACT_V1"
 
 VALID_SIDES = {"LONG", "SHORT"}
 
-# Temporary quarantine until live/forward evidence improves.
-QUARANTINED_SETUPS = {
-    "CAPITULATION_REBOUND_LONG",
-}
+# La quarantena de setups és dinàmica i la decideix el nucli quantitatiu net.
+QUARANTINED_SETUPS = set()
 
 
 @dataclass(frozen=True)

@@ -9,10 +9,11 @@ from .risk import RiskEngine
 from .reasoning import ReasoningEngine
 from .statistical_edge_authority_v1 import StatisticalEdgeAuthorityV1
 from ..ops.runtime_control import RuntimeControl
+from ..institutional.nucli_quantitatiu_net import get_core as NucliQuantitatiuNet
 
 class DecisionKernel:
     def __init__(self):
-        self.strategy=StrategyEngine(); self.memory=EdgeMemory(); self.risk=RiskEngine(); self.reasoning=ReasoningEngine(); self.control=RuntimeControl(); self.stat_edge=StatisticalEdgeAuthorityV1()
+        self.strategy=StrategyEngine(); self.memory=EdgeMemory(); self.risk=RiskEngine(); self.reasoning=ReasoningEngine(); self.control=RuntimeControl(); self.stat_edge=StatisticalEdgeAuthorityV1(); self.nucli_quant=NucliQuantitatiuNet(self.memory.db)
 
     def _edge_keys(self, cand, ctx):
         return self.memory.keys_for(cand.symbol,cand.side,cand.setup,ctx['regime'],ctx['session'],ctx['volatility_bucket'],ctx['news_bucket'])
@@ -30,6 +31,10 @@ class DecisionKernel:
             edge['status']=authority.get('edge_status', edge.get('status','INSUFFICIENT'))
             edge['score_adjustment']=fnum(edge.get('score_adjustment'),0)+fnum(authority.get('score_adjustment'),0)
             edge['size_multiplier']=fnum(edge.get('size_multiplier'),0.6)*fnum(authority.get('size_multiplier'),1.0)
+            try:
+                edge=self.nucli_quant.ajusta_edge_candidat(cand, ctx, edge)
+            except Exception as _e_quant:
+                edge.setdefault('reasons', []).append('ERROR_NUCLI_QUANT_NET_'+repr(_e_quant)[:80])
             risk=self.risk.size(cand,ctx,edge,wallet)
 
             # AUTHORITY_SIZE_USD_CAP_APPLIED
@@ -94,7 +99,12 @@ class DecisionKernel:
                 action='WAIT'; risk['size_usd']=0
 
             trade_plan=self.reasoning.plan(cand, ctx, edge, risk, layers)
-            feature_summary={'regime':ctx['regime'],'session':ctx['session'],'volatility_bucket':ctx['volatility_bucket'],'news_bucket':ctx['news_bucket'],'dq':dq,'liq':liq,'macro':macro,'news':news,'flags':ctx['flags'], 'trade_plan': trade_plan, 'conflicts': trade_plan.get('conflict_matrix',{}).get('conflicts',[]), 'supports': trade_plan.get('conflict_matrix',{}).get('supports',[]), 'statistical_edge_authority_v1': authority, 'runtime_control': {'mode': policy.get('mode'), 'open_threshold': open_th, 'probe_threshold': probe_th, 'risk_mult': policy.get('risk_mult'), 'paused': policy.get('paused'), 'allow_new_trades': policy.get('allow_new_trades'), 'allow_long': policy.get('allow_long'), 'allow_short': policy.get('allow_short')}}
-            decisions.append(Decision(cand.symbol, action, cand.side, cand.setup, cand.trade_type, final, confidence, fnum(risk.get('size_usd')), fnum(ctx['price']), cand.invalidation, cand.tp1, cand.tp2, reasons, layers, risk, edge, feature_summary))
-        decisions.sort(key=lambda d:d.final_score, reverse=True)
+            feature_summary={'regime':ctx['regime'],'session':ctx['session'],'volatility_bucket':ctx['volatility_bucket'],'news_bucket':ctx['news_bucket'],'dq':dq,'liq':liq,'macro':macro,'news':news,'flags':ctx['flags'], 'technical':ctx.get('technical',{}), 'levels':ctx.get('levels',{}), 'micro':ctx.get('micro',{}), 'derivatives':ctx.get('derivatives',{}), 'mapa_causal':ctx.get('mapa_causal',{}), 'trade_plan': trade_plan, 'conflicts': trade_plan.get('conflict_matrix',{}).get('conflicts',[]), 'supports': trade_plan.get('conflict_matrix',{}).get('supports',[]), 'statistical_edge_authority_v1': authority, 'runtime_control': {'mode': policy.get('mode'), 'open_threshold': open_th, 'probe_threshold': probe_th, 'risk_mult': policy.get('risk_mult'), 'paused': policy.get('paused'), 'allow_new_trades': policy.get('allow_new_trades'), 'allow_long': policy.get('allow_long'), 'allow_short': policy.get('allow_short')}}
+            decisio=Decision(cand.symbol, action, cand.side, cand.setup, cand.trade_type, final, confidence, fnum(risk.get('size_usd')), fnum(ctx['price']), cand.invalidation, cand.tp1, cand.tp2, reasons, layers, risk, edge, feature_summary)
+            try:
+                decisio=self.nucli_quant.aplica_politica_decisio(decisio, wallet)
+            except Exception as _e_quant_policy:
+                decisio.reasons.append('ERROR_POLITICA_QUANT_NETA_'+repr(_e_quant_policy)[:80])
+            decisions.append(decisio)
+        decisions.sort(key=lambda d: ({'OPEN':2,'PROBE':1,'WAIT':0}.get(str(d.action).upper(),0), d.final_score), reverse=True)
         return decisions
