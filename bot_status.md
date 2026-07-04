@@ -1,9 +1,9 @@
 JOAN BOT LIVE STATUS
 
-updated_utc: 2026-07-04T09:08:00.633367+00:00
+updated_utc: 2026-07-04T09:10:07.444152+00:00
 
 PROCESS:
-u0_a197   9749  6728  4  1970 ?        00:00:17 python -m joanbot.runner
+u0_a197  10881  6728  2  1970 ?        00:00:01 python -m joanbot.runner
 
 HEALTH:
 state: GREEN
